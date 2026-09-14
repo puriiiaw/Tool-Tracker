@@ -135,3 +135,35 @@ export function returnEvents(checkoutId: number): ReturnEventRow[] {
     )
     .all(checkoutId) as ReturnEventRow[];
 }
+
+export type ActivityRow = {
+  kind: "checkout" | "return";
+  at: string;
+  checkout_id: number;
+  worker_name: string;
+  admin_name: string;
+  summary: string;
+};
+
+// Latest checkouts and returns, newest first, for the dashboard feed.
+export function recentActivity(limit = 12): ActivityRow[] {
+  return db
+    .prepare(
+      `SELECT 'checkout' AS kind, c.created_at AS at, c.id AS checkout_id, w.name AS worker_name, u.name AS admin_name,
+              (SELECT GROUP_CONCAT(CASE WHEN cl.qty_out > 1 THEN cl.qty_out || '× ' ELSE '' END || t.name, ', ')
+                 FROM checkout_line cl JOIN tool t ON t.id = cl.tool_id WHERE cl.checkout_id = c.id AND cl.removed = 0) AS summary
+       FROM checkout c JOIN worker w ON w.id = c.worker_id JOIN user u ON u.id = c.created_by
+       UNION ALL
+       SELECT 'return', r.created_at, c.id, w.name, u.name,
+              (CASE WHEN r.qty > 1 THEN r.qty || '× ' ELSE '' END) || t.name || ' ' || r.outcome
+       FROM return_event r
+       JOIN checkout_line cl ON cl.id = r.checkout_line_id
+       JOIN checkout c ON c.id = cl.checkout_id
+       JOIN worker w ON w.id = c.worker_id
+       JOIN user u ON u.id = r.created_by
+       JOIN tool t ON t.id = cl.tool_id
+       WHERE r.voided = 0
+       ORDER BY at DESC LIMIT ?`
+    )
+    .all(limit) as ActivityRow[];
+}

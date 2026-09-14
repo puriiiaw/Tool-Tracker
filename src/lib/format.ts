@@ -32,3 +32,13 @@ export function halifaxToSqlite(local: string) {
   }
   return null;
 }
+
+// Age of a checkout as "3d 4h" / "45m", plus a severity for colouring.
+export function ageOf(sqlite: string, now = Date.now()) {
+  const ms = now - new Date(sqlite.replace(" ", "T") + "Z").getTime();
+  const h = Math.floor(ms / 3600000);
+  const d = Math.floor(h / 24);
+  const label = d >= 1 ? `${d}d ${h % 24}h` : h >= 1 ? `${h}h` : `${Math.max(1, Math.floor(ms / 60000))}m`;
+  const level: "ok" | "warn" | "bad" = d >= 30 ? "bad" : d >= 7 ? "warn" : "ok";
+  return { label, level, days: d };
+}

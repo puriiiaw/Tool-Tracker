@@ -1,31 +1,56 @@
 import Link from "next/link";
 import type { CheckoutRow } from "@/lib/checkouts";
-import { fmtTime } from "@/lib/format";
+import { ageOf, fmtTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const STATUS = {
-  open: "bg-amber-100 text-amber-800",
-  partial: "bg-blue-100 text-blue-800",
-  closed: "bg-zinc-100 text-zinc-600",
+  open: "bg-accent text-accent-foreground",
+  partial: "bg-warn/15 text-[#7a5a00]",
+  closed: "bg-muted text-muted-foreground",
 };
+const STATUS_LABEL = { open: "Out", partial: "Partly back", closed: "Closed" };
 
-export function CheckoutList({ rows, empty = "Nothing here." }: { rows: CheckoutRow[]; empty?: string }) {
-  if (!rows.length) return <p className="p-3 text-sm text-zinc-500">{empty}</p>;
+export function StatusChip({ status }: { status: CheckoutRow["status"] }) {
   return (
-    <ul className="flex flex-col gap-1">
+    <span className={cn("rounded-sm px-2 py-0.5 font-heading text-xs font-semibold uppercase tracking-wide", STATUS[status])}>
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+export function AgeChip({ at }: { at: string }) {
+  const a = ageOf(at);
+  return (
+    <span
+      className={cn(
+        "inline-block min-w-12 rounded-sm px-1.5 py-0.5 text-center font-heading text-xs font-semibold tabular-nums",
+        a.level === "bad" ? "bg-bad text-white" : a.level === "warn" ? "bg-warn text-[#1b1b1d]" : "bg-muted text-muted-foreground"
+      )}
+    >
+      {a.label}
+    </span>
+  );
+}
+
+export function CheckoutList({ rows, empty = "Nothing here.", showAge }: { rows: CheckoutRow[]; empty?: string; showAge?: boolean }) {
+  if (!rows.length) return <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{empty}</p>;
+  return (
+    <ul className="flex flex-col gap-2">
       {rows.map((c) => (
         <li key={c.id}>
-          <Link href={`/log/${c.id}`} className="card block">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">{c.worker_name}</span>
-              <span className={`rounded px-2 py-0.5 text-xs ${STATUS[c.status]}`}>
-                {c.status === "open" ? "out" : c.status === "partial" ? "partly back" : "closed"}
+          <Link href={`/log/${c.id}`} className="block rounded-lg border bg-card p-3 shadow-xs transition-colors active:bg-muted">
+            <div className="flex items-center gap-2">
+              <span className="font-heading text-lg font-semibold leading-tight">{c.worker_name}</span>
+              <span className="ml-auto flex items-center gap-1.5">
+                {showAge && c.status !== "closed" && <AgeChip at={c.created_at} />}
+                <StatusChip status={c.status} />
               </span>
             </div>
-            <div className="text-sm">
+            <div className="mt-1 text-sm">
               {c.lines.map((l) => {
                 const back = l.returned + l.damaged + l.lost;
                 return (
-                  <div key={l.id} className={back === l.qty_out ? "text-zinc-400 line-through" : ""}>
+                  <div key={l.id} className={back === l.qty_out ? "text-muted-foreground line-through" : ""}>
                     {l.qty_out > 1 ? `${l.qty_out}× ` : ""}
                     {l.tool_name}
                     {back > 0 && back < l.qty_out ? ` (${back} back)` : ""}
@@ -34,7 +59,7 @@ export function CheckoutList({ rows, empty = "Nothing here." }: { rows: Checkout
                 );
               })}
             </div>
-            <div className="text-xs text-zinc-500">
+            <div className="mt-1 text-xs text-muted-foreground">
               {fmtTime(c.created_at)} · {c.admin_name}
               {c.note ? ` · ${c.note}` : ""}
             </div>
