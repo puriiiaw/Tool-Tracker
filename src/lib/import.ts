@@ -1,5 +1,6 @@
 import type { Database } from "better-sqlite3";
 import * as XLSX from "xlsx";
+import { categoryFor } from "./category.ts";
 
 export type ExportRow = {
   name: string | null;
@@ -156,11 +157,11 @@ export function applyImport(db: Database, plan: Plan, actorId: number, fileName:
   const getTool = db.prepare("SELECT * FROM tool WHERE id = ?");
   db.transaction(() => {
     const insTool = db.prepare(
-      `INSERT INTO tool (name, scan_code, serial_number, manufacturer, model, item_type, total_qty, import_flag)
-       VALUES (@name, @scan_code, @serial_number, @manufacturer, @model, @item_type, @total_qty, @flag)`
+      `INSERT INTO tool (name, scan_code, serial_number, manufacturer, model, item_type, total_qty, import_flag, category)
+       VALUES (@name, @scan_code, @serial_number, @manufacturer, @model, @item_type, @total_qty, @flag, @category)`
     );
     for (const t of plan.newUnique) {
-      const id = Number(insTool.run({ ...t, item_type: "unique", total_qty: 1 }).lastInsertRowid);
+      const id = Number(insTool.run({ ...t, item_type: "unique", total_qty: 1, category: categoryFor(t.name) }).lastInsertRowid);
       audit.run(actorId, "tool", id, "import_create", null, JSON.stringify(getTool.get(id)));
     }
     const upd = db.prepare(
@@ -175,7 +176,7 @@ export function applyImport(db: Database, plan: Plan, actorId: number, fileName:
     for (const g of plan.quantityGroups) {
       let id = g.toolId;
       if (!id) {
-        id = Number(insTool.run({ name: g.name, scan_code: null, serial_number: null, manufacturer: g.manufacturer, model: g.model, item_type: "quantity", total_qty: 0, flag: g.flag }).lastInsertRowid);
+        id = Number(insTool.run({ name: g.name, scan_code: null, serial_number: null, manufacturer: g.manufacturer, model: g.model, item_type: "quantity", total_qty: 0, flag: g.flag, category: categoryFor(g.name) }).lastInsertRowid);
       }
       if (!g.newUnits.length && !g.flag) continue;
       const before = getTool.get(id);

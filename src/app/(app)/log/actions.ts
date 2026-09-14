@@ -9,11 +9,12 @@ import { getCheckout } from "@/lib/checkouts";
 type Outcome = "returned" | "damaged" | "lost";
 const OUTCOMES: Outcome[] = ["returned", "damaged", "lost"];
 
-function recordReturns(
+export async function recordReturns(
   actorId: number,
   checkoutId: number,
   items: { lineId: number; qty: number; outcome: Outcome }[]
 ) {
+  await requireUser();
   const co = getCheckout(checkoutId);
   if (!co) throw new Error("Checkout not found.");
   db.transaction(() => {
@@ -51,7 +52,7 @@ export async function returnAll(form: FormData) {
     .filter((i) => i.qty > 0);
   if (!items.length) back(id, "Nothing left to return.");
   try {
-    recordReturns(actor.id, id, items);
+    await recordReturns(actor.id, id, items);
   } catch (e) {
     back(id, (e as Error).message);
   }
@@ -72,7 +73,7 @@ export async function returnPartial(form: FormData) {
   }
   if (!items.length) back(id, "Enter a quantity for at least one line.");
   try {
-    recordReturns(actor.id, id, items);
+    await recordReturns(actor.id, id, items);
   } catch (e) {
     back(id, (e as Error).message);
   }

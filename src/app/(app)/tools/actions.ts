@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { CATEGORIES, categoryFor } from "@/lib/category";
 
-const FIELDS = ["name", "item_type", "total_qty", "model", "scan_code", "serial_number", "manufacturer", "status", "notes", "import_flag"] as const;
+const FIELDS = ["name", "item_type", "total_qty", "model", "scan_code", "serial_number", "manufacturer", "status", "notes", "import_flag", "category"] as const;
 const getRow = db.prepare(`SELECT id, ${FIELDS.join(", ")} FROM tool WHERE id = ?`);
 
 function read(form: FormData) {
@@ -21,6 +22,7 @@ function read(form: FormData) {
     serial_number: s("serial_number"),
     manufacturer: s("manufacturer"),
     notes: s("notes"),
+    category: (CATEGORIES as readonly string[]).includes(String(form.get("category"))) ? String(form.get("category")) : categoryFor(String(form.get("name") ?? "")),
   };
 }
 
@@ -33,8 +35,8 @@ export async function createTool(form: FormData) {
   const id = db.transaction(() => {
     const id = Number(
       db.prepare(
-        `INSERT INTO tool (name, item_type, total_qty, model, scan_code, serial_number, manufacturer, notes)
-         VALUES (@name, @item_type, @total_qty, @model, @scan_code, @serial_number, @manufacturer, @notes)`
+        `INSERT INTO tool (name, item_type, total_qty, model, scan_code, serial_number, manufacturer, notes, category)
+         VALUES (@name, @item_type, @total_qty, @model, @scan_code, @serial_number, @manufacturer, @notes, @category)`
       ).run(v).lastInsertRowid
     );
     audit(actor.id, "tool", id, "create", null, getRow.get(id));
@@ -58,7 +60,7 @@ export async function updateTool(form: FormData) {
   db.transaction(() => {
     db.prepare(
       `UPDATE tool SET name=@name, total_qty=@total_qty, model=@model, scan_code=@scan_code,
-         serial_number=@serial_number, manufacturer=@manufacturer, notes=@notes, status=@status,
+         serial_number=@serial_number, manufacturer=@manufacturer, notes=@notes, status=@status, category=@category,
          import_flag = CASE WHEN @clear THEN NULL ELSE import_flag END
        WHERE id=@id`
     ).run({ ...v, status, id, clear: form.get("clear_flag") ? 1 : 0 });

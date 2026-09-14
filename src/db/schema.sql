@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS tool (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'damaged', 'lost', 'retired')),
   import_flag TEXT,
   notes TEXT,
+  category TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

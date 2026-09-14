@@ -4,6 +4,7 @@ import { toolStock } from "@/lib/inventory";
 import { listCheckouts } from "@/lib/checkouts";
 import { CheckoutList } from "@/components/checkout-list";
 import { updateTool } from "../actions";
+import { CATEGORIES } from "@/lib/category";
 
 export default async function ToolPage({
   params,
@@ -49,6 +50,10 @@ export default async function ToolPage({
         <input name="serial_number" defaultValue={t.serial_number ?? ""} className="input" />
         <label className="text-xs text-zinc-500">Manufacturer</label>
         <input name="manufacturer" defaultValue={t.manufacturer ?? ""} className="input" />
+        <label className="text-xs text-zinc-500">Category</label>
+        <select name="category" defaultValue={t.category ?? ""} className="input">
+          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <label className="text-xs text-zinc-500">Status</label>
         <select name="status" defaultValue={t.status} className="input">
           <option value="active">Active</option>

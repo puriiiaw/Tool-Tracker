@@ -14,6 +14,7 @@ export type ToolStock = {
   status: "active" | "damaged" | "lost" | "retired";
   import_flag: string | null;
   notes: string | null;
+  category: string | null;
   out_qty: number;
   damaged_qty: number;
   lost_qty: number;

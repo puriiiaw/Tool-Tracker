@@ -1,27 +1,44 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, PlusSquare } from "lucide-react";
+import {
+  AlertTriangle, ArrowRight, BatteryCharging, Briefcase, ChevronRight, Drill, FileText, HardHat,
+  Plug, Ruler, Undo2, Upload, Users, type LucideIcon,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { listCheckouts, recentActivity } from "@/lib/checkouts";
+import { listCheckouts } from "@/lib/checkouts";
 import { allToolStock } from "@/lib/inventory";
-import { ageOf, fmtTime } from "@/lib/format";
-import { AgeChip, CheckoutList, StatusChip } from "@/components/checkout-list";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CATEGORIES, type Category } from "@/lib/category";
+import { AgeChip } from "@/components/checkout-list";
 import { cn } from "@/lib/utils";
 
-function Stat({ label, value, tone, href, wide }: { label: string; value: number; tone?: "warn" | "bad"; href: string; wide?: boolean }) {
+const initials = (name: string) =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
+
+const CAT_META: Record<Category, { icon: LucideIcon; bar: string }> = {
+  Batteries: { icon: BatteryCharging, bar: "bg-green" },
+  Chargers: { icon: Plug, bar: "bg-blue" },
+  "Power Tools": { icon: Drill, bar: "bg-navy" },
+  "Safety Equipment": { icon: HardHat, bar: "bg-amber" },
+  "Lasers & Layout": { icon: Ruler, bar: "bg-blue" },
+  "Access Equipment": { icon: Briefcase, bar: "bg-navy" },
+};
+
+function Stat({ icon: Icon, label, value, sub, tone, href }: {
+  icon: LucideIcon; label: string; value: number; sub: string; tone: "blue" | "green" | "navy" | "red"; href: string;
+}) {
+  const tones = {
+    blue: "bg-[#eaf2fd] border-[#d3e2f7] text-blue",
+    green: "bg-[#ebf7ee] border-[#cfe9d6] text-green",
+    navy: "bg-[#eaf1fa] border-[#d3e0f2] text-navy",
+    red: "bg-[#fdeeee] border-[#f6d2d0] text-red",
+  }[tone];
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group relative overflow-hidden rounded-lg border bg-card p-4 shadow-xs transition-colors hover:border-foreground/30",
-        wide && "col-span-2 lg:col-span-1",
-        tone === "bad" && value > 0 && "border-bad/40",
-        tone === "warn" && value > 0 && "border-warn/60"
-      )}
-    >
-      <div className="font-heading text-4xl font-bold leading-none tabular-nums lg:text-5xl">{value}</div>
-      <div className="mt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <ArrowRight className="absolute right-3 top-3 size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+    <Link href={href} className={cn("panel flex gap-4 border p-5 transition-shadow hover:shadow-md", tones)}>
+      <span className="grid size-14 shrink-0 place-items-center rounded-full bg-white/80 lg:size-16"><Icon className="size-7 lg:size-8" strokeWidth={2} /></span>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold leading-tight text-foreground lg:text-base">{label}</div>
+        <div className="mt-1 text-4xl font-bold leading-none tabular-nums lg:text-6xl">{value}</div>
+        <div className="mt-2 hidden text-sm text-muted-foreground sm:block">{sub}</div>
+      </div>
     </Link>
   );
 }
@@ -29,155 +46,126 @@ function Stat({ label, value, tone, href, wide }: { label: string; value: number
 export default async function Home() {
   await requireUser();
   const open = listCheckouts({ status: "open" }, 500).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const outRows = open.flatMap((c) =>
+    c.lines
+      .map((l) => ({ ...l, remaining: l.qty_out - l.returned - l.damaged - l.lost, checkout: c }))
+      .filter((l) => l.remaining > 0)
+  );
   const holders = new Set(open.map((c) => c.worker_id)).size;
-  const itemsOut = open.reduce((s, c) => s + c.remaining, 0);
-  const old = open.filter((c) => ageOf(c.created_at).days >= 7).length;
   const tools = allToolStock();
-  const stock = tools.filter((t) => t.item_type === "quantity" && t.status === "active");
+  const active = tools.filter((t) => t.status === "active");
+  const onHand = active.reduce((s, t) => s + Math.max(0, t.on_hand), 0);
   const attention = tools.filter((t) => t.import_flag || t.status === "damaged" || t.status === "lost");
-  const activity = recentActivity();
+  const byCat = CATEGORIES.map((cat) => {
+    const rows = active.filter((t) => t.category === cat);
+    return { cat, onHand: rows.reduce((s, t) => s + Math.max(0, t.on_hand), 0), total: rows.reduce((s, t) => s + t.total_qty, 0) };
+  }).filter((c) => c.total > 0);
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-3xl font-bold leading-none lg:text-4xl">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">EX-4002 QEII Halifax</p>
-        </div>
-        <Link
-          href="/checkout"
-          className="inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 font-heading text-lg font-semibold text-primary-foreground shadow-sm hover:brightness-95"
-        >
-          <PlusSquare className="size-5" /> New checkout
-        </Link>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
+        <Stat icon={Upload} label="Open Checkouts" value={open.length} sub="Tools currently out on site" tone="blue" href="/log" />
+        <Stat icon={Users} label="Workers Holding Tools" value={holders} sub="Active workers with tools" tone="green" href="/workers" />
+        <Stat icon={Briefcase} label="Tools On Hand" value={onHand} sub="Available on site" tone="navy" href="/tools" />
+        <Stat icon={AlertTriangle} label="Items Needing Attention" value={attention.length} sub="Damaged, lost or flagged" tone="red" href="/tools?flag=1" />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Open checkouts" value={open.length} href="/log" />
-        <Stat label="Workers holding kit" value={holders} href="/workers" />
-        <Stat label="Items out" value={itemsOut} href="/log" />
-        <Stat label="Out over 7 days" value={old} tone="warn" href="/log" />
-        <Stat label="Damaged or lost" value={attention.filter((t) => t.status !== "active").length} tone="bad" href="/tools?status=damaged" wide />
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {/* Out now */}
-        <section className="min-w-0">
-          <div className="mb-2 flex items-baseline justify-between">
-            <h2 className="font-heading text-2xl font-semibold">Out now</h2>
-            <Link href="/log" className="text-sm text-muted-foreground underline-offset-4 hover:underline">Full log</Link>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        {/* Currently out */}
+        <section className="panel p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Currently Out</h2>
+            <Link href="/log" className="flex items-center gap-1 text-sm font-medium text-blue hover:underline">View all <ArrowRight className="size-4" /></Link>
           </div>
-          <div className="lg:hidden">
-            <CheckoutList rows={open} empty="Everything is in." showAge />
-          </div>
-          <div className="hidden overflow-hidden rounded-lg border bg-card shadow-xs lg:block">
-            {open.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/60 hover:bg-muted/60">
-                    <TableHead className="w-24">Age</TableHead>
-                    <TableHead>Worker</TableHead>
-                    <TableHead>Items still out</TableHead>
-                    <TableHead className="w-40">Out since</TableHead>
-                    <TableHead className="w-28">By</TableHead>
-                    <TableHead className="w-28 text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {open.map((c) => (
-                    <TableRow key={c.id} className="cursor-pointer">
-                      <TableCell><AgeChip at={c.created_at} /></TableCell>
-                      <TableCell>
-                        <Link href={`/log/${c.id}`} className="font-heading text-lg font-semibold hover:underline">{c.worker_name}</Link>
-                      </TableCell>
-                      <TableCell className="whitespace-normal">
-                        {c.lines
-                          .filter((l) => l.qty_out - l.returned - l.damaged - l.lost > 0)
-                          .map((l) => `${l.qty_out - l.returned - l.damaged - l.lost > 1 ? `${l.qty_out - l.returned - l.damaged - l.lost}× ` : ""}${l.tool_name}`)
-                          .join(", ")}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{fmtTime(c.created_at)}</TableCell>
-                      <TableCell className="text-muted-foreground">{c.admin_name}</TableCell>
-                      <TableCell className="text-right"><StatusChip status={c.status} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="p-8 text-center text-muted-foreground">Everything is in.</p>
-            )}
-          </div>
+          {outRows.length ? (
+            <table className="mt-3 w-full text-[15px]">
+              <thead>
+                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="py-2 font-semibold">Worker</th>
+                  <th className="py-2 font-semibold">Tool</th>
+                  <th className="py-2 text-right font-semibold">Qty</th>
+                  <th className="hidden py-2 text-right font-semibold sm:table-cell">Age</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outRows.slice(0, 8).map((r) => (
+                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
+                    <td className="py-2.5">
+                      <Link href={`/log/${r.checkout.id}`} className="flex items-center gap-3">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-navy">{initials(r.checkout.worker_name)}</span>
+                        <span className="font-medium">{r.checkout.worker_name}</span>
+                      </Link>
+                    </td>
+                    <td className="py-2.5">{r.tool_name}</td>
+                    <td className="py-2.5 text-right tabular-nums">{r.remaining}</td>
+                    <td className="hidden py-2.5 text-right sm:table-cell"><AgeChip at={r.checkout.created_at} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="py-10 text-center text-muted-foreground">Everything is in.</p>
+          )}
+          {outRows.length > 8 && (
+            <Link href="/log" className="mt-2 block text-center text-sm text-muted-foreground hover:underline">{outRows.length - 8} more</Link>
+          )}
         </section>
 
-        <aside className="flex flex-col gap-5">
-          {/* Stock */}
-          <section className="rounded-lg border bg-card p-4 shadow-xs">
-            <h2 className="mb-3 font-heading text-xl font-semibold">Batteries & chargers</h2>
-            <ul className="flex flex-col gap-2.5">
-              {stock.map((t) => {
-                const pct = t.total_qty ? Math.round((t.on_hand / t.total_qty) * 100) : 0;
-                return (
-                  <li key={t.id}>
-                    <Link href={`/tools/${t.id}`} className="block">
-                      <div className="flex items-baseline justify-between text-sm">
-                        <span className="truncate pr-2">{t.name}</span>
-                        <span className={cn("font-heading text-base font-semibold tabular-nums", t.on_hand === 0 && "text-bad")}>
-                          {t.on_hand}<span className="text-muted-foreground">/{t.total_qty}</span>
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-sm bg-muted">
-                        <div className={cn("h-full", pct < 20 ? "bg-bad" : pct < 50 ? "bg-warn" : "bg-foreground")} style={{ width: `${pct}%` }} />
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-              {!stock.length && <li className="text-sm text-muted-foreground">No quantity items yet.</li>}
-            </ul>
-          </section>
-
-          {/* Attention */}
-          {attention.length > 0 && (
-            <section className="rounded-lg border border-warn/50 bg-card p-4 shadow-xs">
-              <h2 className="mb-2 flex items-center gap-2 font-heading text-xl font-semibold">
-                <AlertTriangle className="size-5 text-warn" /> Needs attention
-              </h2>
-              <ul className="flex flex-col gap-1 text-sm">
-                {attention.slice(0, 8).map((t) => (
-                  <li key={t.id}>
-                    <Link href={`/tools/${t.id}`} className="flex justify-between gap-2 hover:underline">
-                      <span className="truncate">{t.name}</span>
-                      <span className={cn("shrink-0 text-xs", t.status !== "active" ? "text-bad" : "text-muted-foreground")}>
-                        {t.status !== "active" ? t.status : t.import_flag}
+        {/* Stock summary */}
+        <section className="panel p-5">
+          <h2 className="text-2xl font-bold">Stock Summary</h2>
+          <div className="mt-3 flex justify-between border-b pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <span>Category</span><span>On hand / Total</span>
+          </div>
+          <ul>
+            {byCat.map(({ cat, onHand, total }) => {
+              const { icon: Icon, bar } = CAT_META[cat];
+              const pct = total ? Math.round((onHand / total) * 100) : 0;
+              return (
+                <li key={cat} className="border-b py-3.5 last:border-0">
+                  <Link href={`/tools?category=${encodeURIComponent(cat)}`} className="grid grid-cols-[auto_1fr_minmax(0,1fr)] items-center gap-4">
+                    <Icon className={cn("size-6", bar.replace("bg-", "text-"))} strokeWidth={2} />
+                    <span className="font-semibold">{cat}</span>
+                    <span className="min-w-0">
+                      <span className="block text-right text-lg tabular-nums"><b>{onHand}</b> <span className="text-muted-foreground">/ {total}</span></span>
+                      <span className="mt-1 block h-2 overflow-hidden rounded-full bg-muted">
+                        <span className={cn("block h-full rounded-full", bar)} style={{ width: `${pct}%` }} />
                       </span>
-                    </Link>
-                  </li>
-                ))}
-                {attention.length > 8 && (
-                  <li><Link href="/tools?flag=1" className="text-xs text-muted-foreground underline">{attention.length - 8} more</Link></li>
-                )}
-              </ul>
-            </section>
-          )}
-
-          {/* Activity */}
-          <section className="rounded-lg border bg-card p-4 shadow-xs">
-            <h2 className="mb-2 font-heading text-xl font-semibold">Recent activity</h2>
-            <ol className="relative flex flex-col gap-3 border-l pl-4 text-sm">
-              {activity.map((a, i) => (
-                <li key={i} className="relative">
-                  <span className={cn("absolute -left-[21px] top-1.5 size-2.5 rounded-full", a.kind === "checkout" ? "bg-primary" : "bg-foreground")} />
-                  <Link href={`/log/${a.checkout_id}`} className="block hover:underline">
-                    <span className="font-medium">{a.worker_name}</span>{" "}
-                    <span className="text-muted-foreground">{a.kind === "checkout" ? "took" : "brought back"}</span> {a.summary}
+                    </span>
                   </Link>
-                  <div className="text-xs text-muted-foreground">{fmtTime(a.at)} · {a.admin_name}</div>
                 </li>
-              ))}
-              {!activity.length && <li className="text-muted-foreground">No activity yet.</li>}
-            </ol>
-          </section>
-        </aside>
+              );
+            })}
+            {!byCat.length && <li className="py-6 text-center text-muted-foreground">No tools yet.</li>}
+          </ul>
+        </section>
+      </div>
+
+      {/* Action cards */}
+      <div className="panel grid gap-3 p-3 lg:grid-cols-3 lg:gap-4 lg:p-4">
+        {[
+          { href: "/checkout", icon: ArrowRight, title: "New Checkout", sub: "Assign tools to a worker", primary: true },
+          { href: "/returns", icon: Undo2, title: "Record Return", sub: "Check tools back in" },
+          { href: "/log", icon: FileText, title: "View Log", sub: "See all activity" },
+        ].map((a) => (
+          <Link
+            key={a.href}
+            href={a.href}
+            className={cn(
+              "flex items-center gap-4 rounded-xl border px-5 py-4 transition-shadow hover:shadow-md",
+              a.primary ? "border-primary bg-primary text-white" : "border-border bg-card"
+            )}
+          >
+            <span className={cn("grid size-12 shrink-0 place-items-center rounded-full", a.primary ? "bg-white/15" : "bg-secondary text-navy")}>
+              <a.icon className="size-6" strokeWidth={2.2} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xl font-semibold">{a.title}</span>
+              <span className={cn("block text-sm", a.primary ? "text-white/80" : "text-muted-foreground")}>{a.sub}</span>
+            </span>
+            <ChevronRight className="size-6 shrink-0 opacity-70" />
+          </Link>
+        ))}
       </div>
     </div>
   );

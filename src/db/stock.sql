@@ -1,5 +1,5 @@
 SELECT t.id, t.name, t.model, t.scan_code, t.serial_number, t.manufacturer, t.item_type,
-         t.total_qty, t.status, t.import_flag, t.notes,
+         t.total_qty, t.status, t.import_flag, t.notes, t.category,
          COALESCE(l.out_qty, 0) AS out_qty,
          COALESCE(l.damaged_qty, 0) AS damaged_qty,
          COALESCE(l.lost_qty, 0) AS lost_qty,
