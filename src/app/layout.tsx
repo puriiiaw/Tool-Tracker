@@ -11,8 +11,8 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${barlow.variable} ${condensed.variable}`}>
-      <body className="min-h-screen">
+    <html lang="en" className={`${barlow.variable} ${condensed.variable}`} suppressHydrationWarning>
+      <body className="min-h-screen" suppressHydrationWarning>
         {children}
         <Toaster position="top-center" richColors />
       </body>
