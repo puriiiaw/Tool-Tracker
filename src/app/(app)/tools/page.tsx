@@ -6,15 +6,16 @@ import { createTool } from "./actions";
 export default async function ToolsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; msg?: string; add?: string }>;
+  searchParams: Promise<{ q?: string; msg?: string; add?: string; status?: string; flag?: string }>;
 }) {
   await requireUser();
-  const { q = "", msg, add } = await searchParams;
+  const { q = "", msg, add, status, flag } = await searchParams;
   const k = q.toLowerCase();
   const tools = allToolStock().filter(
     (t) =>
-      !k ||
-      [t.name, t.model, t.scan_code, t.serial_number].some((f) => f && f.toLowerCase().includes(k))
+      (!k || [t.name, t.model, t.scan_code, t.serial_number].some((f) => f && f.toLowerCase().includes(k))) &&
+      (!status || t.status === status) &&
+      (!flag || t.import_flag)
   );
   return (
     <div className="flex flex-col gap-3">
