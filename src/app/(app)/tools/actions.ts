@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 
-const FIELDS = ["name", "item_type", "total_qty", "model", "scan_code", "serial_number", "manufacturer", "status", "notes"] as const;
+const FIELDS = ["name", "item_type", "total_qty", "model", "scan_code", "serial_number", "manufacturer", "status", "notes", "import_flag"] as const;
 const getRow = db.prepare(`SELECT id, ${FIELDS.join(", ")} FROM tool WHERE id = ?`);
 
 function read(form: FormData) {
@@ -58,9 +58,10 @@ export async function updateTool(form: FormData) {
   db.transaction(() => {
     db.prepare(
       `UPDATE tool SET name=@name, total_qty=@total_qty, model=@model, scan_code=@scan_code,
-         serial_number=@serial_number, manufacturer=@manufacturer, notes=@notes, status=@status
+         serial_number=@serial_number, manufacturer=@manufacturer, notes=@notes, status=@status,
+         import_flag = CASE WHEN @clear THEN NULL ELSE import_flag END
        WHERE id=@id`
-    ).run({ ...v, status, id });
+    ).run({ ...v, status, id, clear: form.get("clear_flag") ? 1 : 0 });
     audit(actor.id, "tool", id, "update", before, getRow.get(id));
   })();
   redirect(`/tools/${id}?msg=` + encodeURIComponent("Saved."));

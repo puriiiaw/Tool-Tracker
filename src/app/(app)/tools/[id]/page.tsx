@@ -58,7 +58,12 @@ export default async function ToolPage({
         </select>
         <label className="text-xs text-zinc-500">Notes</label>
         <input name="notes" defaultValue={t.notes ?? ""} className="input" />
-        {t.import_flag && <p className="text-sm text-amber-700">Import flag: {t.import_flag}</p>}
+        {t.import_flag && (
+          <label className="flex min-h-11 items-center gap-2 text-sm text-amber-700">
+            <input type="checkbox" name="clear_flag" value="1" className="size-5" />
+            Reviewed, clear flag: {t.import_flag}
+          </label>
+        )}
         <button className="btn-primary">Save</button>
       </form>
 

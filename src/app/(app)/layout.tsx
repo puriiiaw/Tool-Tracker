@@ -24,9 +24,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Workers
           </Link>
           {user.role === "super_admin" && (
-            <Link href="/accounts" className="nav">
-              Accounts
-            </Link>
+            <>
+              <Link href="/import" className="nav">
+                Import
+              </Link>
+              <Link href="/accounts" className="nav">
+                Accounts
+              </Link>
+            </>
           )}
         </nav>
         <form action={logout} className="ml-auto">

@@ -49,7 +49,7 @@ export default async function Home() {
               <div className={`font-bold ${t.on_hand === 0 ? "text-red-700" : ""}`}>
                 {t.on_hand}/{t.total_qty}
               </div>
-              <div className="text-xs text-zinc-500">{t.model ?? t.name}</div>
+              <div className="text-xs text-zinc-500">{t.name}</div>
             </Link>
           ))}
         </div>
