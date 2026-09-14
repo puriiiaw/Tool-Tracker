@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { toolStock } from "@/lib/inventory";
+import { listCheckouts } from "@/lib/checkouts";
+import { CheckoutList } from "@/components/checkout-list";
 import { updateTool } from "../actions";
 
 export default async function ToolPage({
@@ -15,6 +17,7 @@ export default async function ToolPage({
   const { msg } = await searchParams;
   const t = toolStock(Number(id));
   if (!t) notFound();
+  const history = listCheckouts({ tool: t.id, status: "all" });
   return (
     <div className="flex flex-col gap-3">
       <h1 className="text-xl font-bold">{t.name}</h1>
@@ -58,6 +61,9 @@ export default async function ToolPage({
         {t.import_flag && <p className="text-sm text-amber-700">Import flag: {t.import_flag}</p>}
         <button className="btn-primary">Save</button>
       </form>
+
+      <h2 className="font-semibold">History</h2>
+      <CheckoutList rows={history} empty="Never checked out." />
     </div>
   );
 }

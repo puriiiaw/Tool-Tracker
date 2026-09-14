@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/" className="font-bold">
           Tools
         </Link>
-        <nav className="flex gap-1">
+        <nav className="flex gap-1 overflow-x-auto whitespace-nowrap">
           <Link href="/checkout" className="nav">
             Checkout
           </Link>
@@ -19,6 +19,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <Link href="/tools" className="nav">
             Inventory
+          </Link>
+          <Link href="/workers" className="nav">
+            Workers
           </Link>
           {user.role === "super_admin" && (
             <Link href="/accounts" className="nav">
