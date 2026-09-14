@@ -43,7 +43,8 @@ const LINE_AGG = `
          COALESCE(SUM(CASE WHEN r.outcome = 'damaged' THEN r.qty END), 0) AS damaged,
          COALESCE(SUM(CASE WHEN r.outcome = 'lost' THEN r.qty END), 0) AS lost
   FROM checkout_line cl
-  LEFT JOIN return_event r ON r.checkout_line_id = cl.id
+  LEFT JOIN return_event r ON r.checkout_line_id = cl.id AND r.voided = 0
+  WHERE cl.removed = 0
   GROUP BY cl.id`;
 
 const CHECKOUTS = `
@@ -62,6 +63,17 @@ const CHECKOUTS = `
   SELECT *, CASE WHEN remaining = 0 THEN 'closed' WHEN remaining = total THEN 'open' ELSE 'partial' END AS status
   FROM co`;
 
+export function filtersFromParams(p: Record<string, string | undefined>): Filters {
+  return {
+    status: p.status === "all" || p.status === "closed" ? p.status : "open",
+    worker: Number(p.worker) || undefined,
+    tool: Number(p.tool) || undefined,
+    admin: Number(p.admin) || undefined,
+    from: p.from || undefined,
+    to: p.to || undefined,
+  };
+}
+
 export function listCheckouts(f: Filters, limit = 200): CheckoutRow[] {
   const where: string[] = [];
   const params: unknown[] = [];
@@ -73,7 +85,7 @@ export function listCheckouts(f: Filters, limit = 200): CheckoutRow[] {
   };
   if (f.worker) add("worker_id = ?", f.worker);
   if (f.admin) add("created_by = ?", f.admin);
-  if (f.tool) add("id IN (SELECT checkout_id FROM checkout_line WHERE tool_id = ?)", f.tool);
+  if (f.tool) add("id IN (SELECT checkout_id FROM checkout_line WHERE tool_id = ? AND removed = 0)", f.tool);
   // Dates are Halifax local; SQLite stores UTC. Halifax is UTC-3 (ADT) or UTC-4 (AST); use -3 as the boundary.
   if (f.from) add("created_at >= datetime(?, '+3 hours')", f.from);
   if (f.to) add("created_at < datetime(?, '+1 day', '+3 hours')", f.to);
@@ -102,6 +114,8 @@ function attachLines(rows: Omit<CheckoutRow, "lines">[]): CheckoutRow[] {
 
 export type ReturnEventRow = {
   id: number;
+  checkout_line_id: number;
+  voided: number;
   tool_name: string;
   qty: number;
   outcome: string;
@@ -112,7 +126,7 @@ export type ReturnEventRow = {
 export function returnEvents(checkoutId: number): ReturnEventRow[] {
   return db
     .prepare(
-      `SELECT r.id, t.name AS tool_name, r.qty, r.outcome, u.name AS admin_name, r.created_at
+      `SELECT r.id, r.checkout_line_id, r.voided, t.name AS tool_name, r.qty, r.outcome, u.name AS admin_name, r.created_at
        FROM return_event r
        JOIN checkout_line cl ON cl.id = r.checkout_line_id
        JOIN tool t ON t.id = cl.tool_id

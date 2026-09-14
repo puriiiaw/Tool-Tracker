@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
-import { listCheckouts, type Filters } from "@/lib/checkouts";
+import { filtersFromParams, listCheckouts } from "@/lib/checkouts";
 import { CheckoutList } from "@/components/checkout-list";
 
 type Params = { status?: string; worker?: string; tool?: string; admin?: string; from?: string; to?: string; msg?: string };
@@ -8,14 +8,8 @@ type Params = { status?: string; worker?: string; tool?: string; admin?: string;
 export default async function LogPage({ searchParams }: { searchParams: Promise<Params> }) {
   await requireUser();
   const p = await searchParams;
-  const f: Filters = {
-    status: p.status === "all" || p.status === "closed" ? p.status : "open",
-    worker: Number(p.worker) || undefined,
-    tool: Number(p.tool) || undefined,
-    admin: Number(p.admin) || undefined,
-    from: p.from || undefined,
-    to: p.to || undefined,
-  };
+  const f = filtersFromParams(p);
+  const qs = new URLSearchParams(Object.entries(p).filter(([k, v]) => k !== "msg" && v) as [string, string][]).toString();
   const rows = listCheckouts(f);
   const workers = db.prepare("SELECT id, name FROM worker ORDER BY name").all() as { id: number; name: string }[];
   const tools = db.prepare("SELECT id, name FROM tool ORDER BY name").all() as { id: number; name: string }[];
@@ -65,7 +59,10 @@ export default async function LogPage({ searchParams }: { searchParams: Promise<
         </details>
       </form>
 
-      <p className="text-sm text-zinc-500">{rows.length} checkout{rows.length === 1 ? "" : "s"}</p>
+      <p className="flex items-center justify-between text-sm text-zinc-500">
+        <span>{rows.length} checkout{rows.length === 1 ? "" : "s"}</span>
+        <a href={`/log/export?${qs}`} className="underline">Export CSV</a>
+      </p>
       <CheckoutList rows={rows} empty="No checkouts match." />
     </div>
   );

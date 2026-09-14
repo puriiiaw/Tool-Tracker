@@ -29,6 +29,8 @@ export default async function CheckoutPage({
         <p className="text-sm text-zinc-500">
           Out {fmtTime(co.created_at)} by {co.admin_name}
           {co.note ? ` · ${co.note}` : ""}
+          {" · "}
+          <Link href={`/log/${co.id}/edit`} className="underline">Edit</Link>
         </p>
       </div>
       {msg && <p className="rounded bg-amber-50 p-2 text-sm">{msg}</p>}
@@ -104,8 +106,9 @@ export default async function CheckoutPage({
           <h2 className="mb-1 font-semibold">Return history</h2>
           <ul className="card flex flex-col gap-1 text-sm">
             {events.map((e) => (
-              <li key={e.id}>
+              <li key={e.id} className={e.voided ? "text-zinc-400 line-through" : ""}>
                 {e.qty}× {e.tool_name} {e.outcome} · {fmtTime(e.created_at)} · {e.admin_name}
+                {e.voided ? " (voided)" : ""}
               </li>
             ))}
           </ul>

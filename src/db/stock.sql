@@ -7,8 +7,8 @@ SELECT t.id, t.name, t.model, t.scan_code, t.serial_number, t.manufacturer, t.it
          (SELECT w.name FROM checkout_line cl2
             JOIN checkout c2 ON c2.id = cl2.checkout_id
             JOIN worker w ON w.id = c2.worker_id
-           WHERE cl2.tool_id = t.id AND t.item_type = 'unique'
-             AND cl2.qty_out > (SELECT COALESCE(SUM(qty), 0) FROM return_event WHERE checkout_line_id = cl2.id)
+           WHERE cl2.tool_id = t.id AND cl2.removed = 0 AND t.item_type = 'unique'
+             AND cl2.qty_out > (SELECT COALESCE(SUM(qty), 0) FROM return_event WHERE checkout_line_id = cl2.id AND voided = 0)
            LIMIT 1) AS out_to
   FROM tool t
   LEFT JOIN (
@@ -22,7 +22,8 @@ SELECT t.id, t.name, t.model, t.scan_code, t.serial_number, t.manufacturer, t.it
              SUM(CASE WHEN outcome = 'returned' THEN qty ELSE 0 END) AS returned,
              SUM(CASE WHEN outcome = 'damaged' THEN qty ELSE 0 END) AS damaged,
              SUM(CASE WHEN outcome = 'lost' THEN qty ELSE 0 END) AS lost
-      FROM return_event GROUP BY checkout_line_id
+      FROM return_event WHERE voided = 0 GROUP BY checkout_line_id
     ) r ON r.checkout_line_id = cl.id
+    WHERE cl.removed = 0
     GROUP BY cl.tool_id
   ) l ON l.tool_id = t.id

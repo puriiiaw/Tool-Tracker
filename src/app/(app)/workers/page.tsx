@@ -17,8 +17,8 @@ export default async function WorkersPage({
       .prepare(
         `SELECT w.id, w.name, w.active,
            (SELECT COUNT(*) FROM checkout_line cl JOIN checkout c ON c.id = cl.checkout_id
-             WHERE c.worker_id = w.id
-               AND cl.qty_out > (SELECT COALESCE(SUM(qty), 0) FROM return_event WHERE checkout_line_id = cl.id)) AS out_lines
+             WHERE c.worker_id = w.id AND cl.removed = 0
+               AND cl.qty_out > (SELECT COALESCE(SUM(qty), 0) FROM return_event WHERE checkout_line_id = cl.id AND voided = 0)) AS out_lines
          FROM worker w ORDER BY w.active DESC, w.name`
       )
       .all() as Row[]

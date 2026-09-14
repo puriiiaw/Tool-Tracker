@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS checkout_line (
   checkout_id INTEGER NOT NULL REFERENCES checkout(id),
   tool_id INTEGER NOT NULL REFERENCES tool(id),
   qty_out INTEGER NOT NULL CHECK (qty_out > 0),
-  long_term INTEGER NOT NULL DEFAULT 0
+  long_term INTEGER NOT NULL DEFAULT 0,
+  removed INTEGER NOT NULL DEFAULT 0 -- a line taken off a checkout by an edit; audit keeps it
 );
 
 CREATE TABLE IF NOT EXISTS return_event (
@@ -78,7 +79,8 @@ CREATE TABLE IF NOT EXISTS return_event (
   qty INTEGER NOT NULL CHECK (qty > 0),
   outcome TEXT NOT NULL CHECK (outcome IN ('returned', 'damaged', 'lost')),
   created_by INTEGER NOT NULL REFERENCES user(id),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  voided INTEGER NOT NULL DEFAULT 0 -- a mistaken return is voided, never deleted
 );
 
 CREATE TABLE IF NOT EXISTS import_run (

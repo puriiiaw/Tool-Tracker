@@ -22,7 +22,9 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - Checkout is one screen, three fields (worker, tool, quantity), under ten seconds.
   Anything that adds a step to that flow is rejected by default.
 - A checkout can be edited in full (worker, lines, quantities, time, note) by an admin;
-  the audit record holds the before and after.
+  the audit record holds the before and after. A mistaken return is voided
+  (`return_event.voided`), a mistaken line is marked `checkout_line.removed`. Every stock
+  and log query excludes both. Nothing is deleted.
 
 ## Stack
 
