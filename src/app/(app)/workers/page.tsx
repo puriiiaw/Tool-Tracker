@@ -46,7 +46,8 @@ export default async function WorkersPage({
 
       {plan && staged ? (
         <div className="card flex flex-col gap-2">
-          <h2 className="font-semibold">Preview: {staged.fileName}</h2>
+          <h2 className="font-semibold">Check {staged.fileName}, then confirm</h2>
+          <p className="text-sm text-zinc-600">Nothing is saved until you press the button below.</p>
           <div className="grid grid-cols-3 text-center text-sm">
             <div><b>{plan.add.length}</b><br />new</div>
             <div><b>{plan.reactivate.length}</b><br />brought back</div>
@@ -72,7 +73,9 @@ export default async function WorkersPage({
           )}
           <form action={commitWorkers} className="flex gap-2">
             <input type="hidden" name="t" value={t} />
-            <button className="btn-primary flex-1">Confirm</button>
+            <button className="btn-primary flex-1">
+              {plan.add.length + plan.reactivate.length ? `Add ${plan.add.length + plan.reactivate.length} to roster` : "Nothing to add"}
+            </button>
             <Link href="/workers" className="btn flex items-center">Cancel</Link>
           </form>
         </div>
@@ -85,7 +88,7 @@ export default async function WorkersPage({
             </p>
             <div className="flex gap-2">
               <input type="file" name="file" accept=".xlsx" required className="input min-w-0 flex-1 py-2" />
-              <button className="btn-primary">Preview</button>
+              <button className="btn-primary">Upload</button>
             </div>
           </form>
         )
