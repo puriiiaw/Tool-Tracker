@@ -6,17 +6,13 @@ import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { CATEGORIES, categoryFor } from "@/lib/category";
 
-const FIELDS = ["name", "item_type", "total_qty", "model", "scan_code", "serial_number", "manufacturer", "status", "notes", "import_flag", "category"] as const;
+const FIELDS = ["name", "model", "scan_code", "serial_number", "manufacturer", "status", "notes", "import_flag", "category"] as const;
 const getRow = db.prepare(`SELECT id, ${FIELDS.join(", ")} FROM tool WHERE id = ?`);
 
 function read(form: FormData) {
   const s = (k: string) => String(form.get(k) ?? "").trim() || null;
-  const item_type = form.get("item_type") === "quantity" ? "quantity" : "unique";
-  const total_qty = item_type === "quantity" ? Math.max(0, Math.floor(Number(form.get("total_qty")) || 0)) : 1;
   return {
     name: s("name"),
-    item_type,
-    total_qty,
     model: s("model"),
     scan_code: s("scan_code"),
     serial_number: s("serial_number"),
@@ -35,8 +31,8 @@ export async function createTool(form: FormData) {
   const id = db.transaction(() => {
     const id = Number(
       db.prepare(
-        `INSERT INTO tool (name, item_type, total_qty, model, scan_code, serial_number, manufacturer, notes, category, created_by)
-         VALUES (@name, @item_type, @total_qty, @model, @scan_code, @serial_number, @manufacturer, @notes, @category, @created_by)`
+        `INSERT INTO tool (name, model, scan_code, serial_number, manufacturer, notes, category, created_by)
+         VALUES (@name, @model, @scan_code, @serial_number, @manufacturer, @notes, @category, @created_by)`
       ).run({ ...v, created_by: actor.id }).lastInsertRowid
     );
     audit(actor.id, "tool", id, "create", null, getRow.get(id));
@@ -48,7 +44,7 @@ export async function createTool(form: FormData) {
 export async function updateTool(form: FormData) {
   const actor = await requireUser();
   const id = Number(form.get("id"));
-  const before = getRow.get(id) as { item_type: string } | undefined;
+  const before = getRow.get(id);
   if (!before) redirect("/tools");
   const v = read(form);
   const status = ["active", "damaged", "lost", "retired"].includes(String(form.get("status")))
@@ -59,7 +55,7 @@ export async function updateTool(form: FormData) {
     redirect(`/tools/${id}?msg=` + encodeURIComponent("That scan code belongs to another tool."));
   db.transaction(() => {
     db.prepare(
-      `UPDATE tool SET name=@name, total_qty=@total_qty, model=@model, scan_code=@scan_code,
+      `UPDATE tool SET name=@name, model=@model, scan_code=@scan_code,
          serial_number=@serial_number, manufacturer=@manufacturer, notes=@notes, status=@status, category=@category,
          import_flag = CASE WHEN @clear THEN NULL ELSE import_flag END
        WHERE id=@id`

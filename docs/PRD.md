@@ -41,7 +41,7 @@ In scope (v1)
  | Explicitly out of scope (v1)
  | Import the ON!Track export, recurring, keyed on Scan Code
  | Barcode / QR scanning — moved into scope 2026-09-14, see §12
- | Add and edit tools manually; unique and quantity item types
+ | Add and edit tools manually; every tool is one serial (unique/quantity split dropped 2026-09-15, see §13)
  | Worker self-service (workers never touch the app)
  | Foreman-mediated checkout: worker, tool from inventory list, quantity
  | Due dates, overdue status, alerts, notifications of any kind
@@ -729,12 +729,17 @@ Export name (FR / as-is)
  | 10
  | 
 
+13. One serial per row (decided 2026-09-15)
+Every tool, battery and charger included, is one inventory row keyed by its ON!Track scan code. The unique/quantity split, `tool_unit`, `checkout_line_unit` and the translation table are gone. The export is produced in English, so names import as written; a blank Name falls back to Model and is flagged.
+Checkout has no quantity field: the foreman scans the tag or searches and picks the exact serial. Returns scan the tag or tick the tool. An unknown tag can only be added as a new tool with a typed name.
+Stock Summary on the dashboard and the Tools page group rows by category or model name for display ("on hand / total" = counted rows); every count still comes from checkout lines and return events.
+Pre-launch reset: `scripts/reset-inventory.mjs` emptied tools, checkouts, returns and imports once; accounts and workers were kept. Sections above that describe quantity items, translations or a quantity field are historical.
+
 12. Scanning (decided 2026-09-14)
 Who: the foreman or admin, on their own phone, inside the checkout and returns screens. Workers never scan.
 How: a camera button next to the tool field opens continuous mode; each read beeps, flashes and adds a line; Done closes the camera. The Hilti tag is a Data Matrix; decoded on the phone with zxing, no data leaves the site.
 Unique tools: a scan adds that tool's line. Already out → blocked with "Out to X. Return from X, then check out to Y" as one tap.
-Quantity items (batteries, chargers): a scan adds one to the model's line and records the unit scanned. Returns scan units back; a typed count without scanning is still allowed and marked unscanned in the log. The same unit scanned out twice is blocked like a unique tool.
-Reports: one line per model ("Ali — Battery B 22-85 × 3"); tapping expands to the tags.
-Unknown tag: the screen shows the code and offers "add to an existing model" or "new tool with a name". The record keeps the date and the user who added it, the Tools page shows a column and an "added on site" filter, and the next import preview lists on-site additions absent from ON!Track so they get tagged there.
+Batteries and chargers are serials like any other tool since 2026-09-15 (§13); a scan adds that one tag's line.
+Unknown tag: the screen shows the code and asks for a name; the tool is added as new. The record keeps the date and the user who added it, the Tools page shows a column and an "added on site" filter, and the next import preview lists on-site additions absent from ON!Track so they get tagged there.
 Hosting: phone cameras require HTTPS, so scanning ships with company-owned hosting (Vercel) and the database off the laptop. A self-signed certificate is acceptable for testing only.
 Not now: worker badges, scanning by workers.

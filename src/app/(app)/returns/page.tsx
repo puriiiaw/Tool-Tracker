@@ -81,17 +81,13 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
                     const key = `${c.id}_${l.id}`;
                     return (
                       <div key={l.id} className="flex flex-wrap items-center gap-3 border-b px-3 py-3 last:border-0">
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
                           <div className="font-medium">{l.tool_name}</div>
-                          <div className="text-xs text-muted-foreground">{remaining} still out{l.long_term ? " · long-term" : ""}</div>
+                          <div className="text-xs text-muted-foreground">{l.serial || l.scan_code}{l.long_term ? " · long-term" : ""}</div>
                         </div>
-                        {l.item_type === "quantity" ? (
-                          <input type="number" inputMode="numeric" name={`qty_${key}`} min={0} max={remaining} placeholder={`0–${remaining}`} className="input w-24" />
-                        ) : (
-                          <label className="flex min-h-11 items-center gap-2 px-1">
-                            <input type="checkbox" name={`qty_${key}`} value="1" className="size-5" /> Back
-                          </label>
-                        )}
+                        <label className="flex min-h-11 items-center gap-2 px-1">
+                          <input type="checkbox" name={`back_${key}`} value="1" className="size-5" /> Back
+                        </label>
                         <select name={`outcome_${key}`} defaultValue="returned" className="input w-32">
                           <option value="returned">Returned</option>
                           <option value="damaged">Damaged</option>

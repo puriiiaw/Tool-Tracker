@@ -10,17 +10,17 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - Two login roles: `super_admin` and `admin`. No read-only role. No worker logins ever.
 - Super-admin creates accounts and sets or changes any password directly. No email, no reset links.
 - Workers are roster rows: `name` only, no trade. Quick-add from the checkout screen.
-- Tools are `unique` (one row per serial, out to at most one worker) or `quantity`
-  (one row per model, e.g. "Battery Nuron B 22-85", with a total count). Batteries and
-  chargers are grouped by model; their individual scan codes live in `tool_unit`.
+- Every tool is one row per serial, keyed by its ON!Track scan code, out to at most one
+  worker (decided 2026-09-15; replaces the earlier unique/quantity split). Batteries and
+  chargers are serials too. Grouping by model name is display only: the dashboard Stock
+  Summary and the Tools page show "on hand / total" per category or model, computed by
+  counting rows.
 - Scanning (decided 2026-09-14): the foreman scans the Hilti Data Matrix tag with the phone
   camera as a shortcut inside checkout and returns. Workers still never touch the app.
   Continuous mode: camera stays open, each scan adds a line, Done closes it.
-  A scanned unique tool adds its line. A scanned battery adds one to its model's line and
-  records the unit (`checkout_line_unit`); returns scan the units back, or fall back to a
-  typed count marked unscanned. A unit already out is blocked with a one-tap
-  "return from X, then check out" fix. Reports group by model; tapping expands to tags.
-  Unknown tag: add as a unit of an existing model, or as a new tool; `created_at` and
+  A scanned tag adds that tool's line. A tool already out is blocked with a one-tap
+  "return from X, then check out" fix. Returns scan the tag or tick the tool in the
+  worker's open list. Unknown tag: add as a new tool with a typed name; `created_at` and
   `created_by` record who added it on site, and the next import lists on-site additions
   missing from ON!Track. Decoder: zxing, runs on the phone. Needs HTTPS hosting.
 - Scissor lifts, harnesses, fall-arrest gear import as unique tools and are visible at checkout.
@@ -28,8 +28,8 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - Nothing is ever deleted. Edits keep the original in `audit_log`. Retire = soft hide.
 - On-hand counts are computed from checkout lines and return events, never stored.
 - The import never closes a checkout and never retires a tool; missing tags are flagged.
-- Checkout is one screen, three fields (worker, tool, quantity), under ten seconds.
-  Anything that adds a step to that flow is rejected by default.
+- Checkout is one screen, two fields (worker, tools by scan or search), under ten seconds.
+  No quantity field: a line is always one serial. Anything that adds a step is rejected by default.
 - A checkout can be edited in full (worker, lines, quantities, time, note) by an admin;
   the audit record holds the before and after. A mistaken return is voided
   (`return_event.voided`), a mistaken line is marked `checkout_line.removed`. Every stock
@@ -43,6 +43,8 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - Auth: hand-rolled. `crypto.scrypt` password hashes, `session` table, HTTP-only cookie,
   30-day expiry. Role check happens server-side inside every action.
 - Import: `xlsx` (SheetJS) reads the ON!Track `Assets_Details.xlsx` as-is (header on row 2).
+  The file is exported in English; names import verbatim (no translation table). Keyed on
+  scan code: new codes added, changed fields updated, codes missing from the file flagged.
 - Runs locally with `npm run dev`. No external services required.
 - Repo: https://github.com/puriiiaw/Tool-Tracker
 
@@ -52,7 +54,7 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 2. Checkout screen with worker quick-add
 3. Log page with full and partial returns, damaged and lost outcomes
 4. Dashboard
-5. ON!Track import with preview, translation table, item-type override
+5. ON!Track import with preview
 6. CSV export and checkout editing
 7. Camera scanning at checkout and returns; on-site add of unknown tags; HTTPS hosting
 
@@ -66,8 +68,7 @@ Each step is checked on a phone-width viewport before the next starts.
 - Server components by default; `'use client'` only for hooks, browser APIs, or handlers.
 - Every server action: check session and role first, then write inside one transaction,
   then append to `audit_log` in the same transaction.
-- Validate at the boundary: worker exists, tool exists and is active, quantity within on-hand,
-  unique tool not already out. Reject with a plain message the foreman can read.
+- Validate at the boundary: worker exists, tool exists and is active, tool not already out. Reject with a plain message the foreman can read.
 - Mobile first at 390 px, tap targets at least 44 px, no hover-only controls.
 - No delete statements anywhere in application code. The audit table gets inserts only.
 - Short inline comments only. No docstring padding. Delete code your change made unused.

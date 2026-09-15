@@ -58,7 +58,7 @@ export default async function Home() {
   const attention = tools.filter((t) => t.import_flag || t.status === "damaged" || t.status === "lost");
   const byCat = CATEGORIES.map((cat) => {
     const rows = active.filter((t) => t.category === cat);
-    return { cat, onHand: rows.reduce((s, t) => s + Math.max(0, t.on_hand), 0), total: rows.reduce((s, t) => s + t.total_qty, 0) };
+    return { cat, onHand: rows.reduce((s, t) => s + Math.max(0, t.on_hand), 0), total: rows.length };
   }).filter((c) => c.total > 0);
 
   return (

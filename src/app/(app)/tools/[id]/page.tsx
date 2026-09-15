@@ -6,7 +6,6 @@ import { CheckoutList } from "@/components/checkout-list";
 import { updateTool } from "../actions";
 import { CATEGORIES } from "@/lib/category";
 import { fmtTime } from "@/lib/format";
-import { unitsForTool } from "@/lib/scan";
 
 export default async function ToolPage({
   params,
@@ -27,24 +26,15 @@ export default async function ToolPage({
       {t.added_by && <p className="text-sm text-amber-700">Added on site by {t.added_by}, {fmtTime(t.created_at)}. Not in ON!Track yet.</p>}
       {msg && <p className="rounded bg-amber-50 p-2 text-sm">{msg}</p>}
 
-      <div className="card grid grid-cols-4 text-center text-sm">
-        <div><b>{t.total_qty}</b><br />total</div>
-        <div><b>{t.on_hand}</b><br />on hand</div>
-        <div><b>{t.out_qty}</b><br />out{t.out_to ? ` (${t.out_to})` : ""}</div>
-        <div><b>{t.damaged_qty + t.lost_qty}</b><br />dmg/lost</div>
-      </div>
+      <p className="card text-sm">
+        {t.status !== "active" ? <span className="text-red-700">{t.status}</span> : t.out_to ? <span className="text-amber-700">Out to {t.out_to}</span> : <span className="text-green-700">In</span>}
+        {t.scan_code ? ` · ${t.scan_code}` : ""}
+      </p>
 
       <form action={updateTool} className="card flex flex-col gap-2">
         <input type="hidden" name="id" value={t.id} />
-        <input type="hidden" name="item_type" value={t.item_type} />
         <label className="text-xs text-zinc-500">Name</label>
         <input name="name" defaultValue={t.name} required className="input" />
-        {t.item_type === "quantity" && (
-          <>
-            <label className="text-xs text-zinc-500">Total quantity</label>
-            <input name="total_qty" type="number" inputMode="numeric" min={0} defaultValue={t.total_qty} className="input" />
-          </>
-        )}
         <label className="text-xs text-zinc-500">Model</label>
         <input name="model" defaultValue={t.model ?? ""} className="input" />
         <label className="text-xs text-zinc-500">Scan code</label>
@@ -74,18 +64,6 @@ export default async function ToolPage({
         )}
         <button className="btn-primary">Save</button>
       </form>
-
-      {t.item_type === "quantity" && (
-        <details className="card text-sm">
-          <summary className="cursor-pointer font-semibold">Tags ({unitsForTool(t.id).length})</summary>
-          {unitsForTool(t.id).map((u) => (
-            <div key={u.id} className="flex justify-between py-1">
-              <span>{u.scan_code}{u.serial_number ? ` · ${u.serial_number}` : ""}</span>
-              <span className={u.worker ? "text-amber-700" : "text-green-700"}>{u.worker ? `out: ${u.worker}` : "in"}</span>
-            </div>
-          ))}
-        </details>
-      )}
 
       <h2 className="font-semibold">History</h2>
       <CheckoutList rows={history} empty="Never checked out." />

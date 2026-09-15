@@ -16,8 +16,6 @@ export default async function CheckoutPage() {
       model: t.model,
       scan_code: t.scan_code,
       serial_number: t.serial_number,
-      item_type: t.item_type,
-      on_hand: t.on_hand,
       out_to: t.out_to,
     }));
   return <CheckoutForm workers={workers} tools={tools} />;

@@ -1,14 +1,14 @@
-SELECT t.id, t.name, t.model, t.scan_code, t.serial_number, t.manufacturer, t.item_type,
-         t.total_qty, t.status, t.import_flag, t.notes, t.category, t.created_at,
+SELECT t.id, t.name, t.model, t.scan_code, t.serial_number, t.manufacturer,
+         t.status, t.import_flag, t.notes, t.category, t.created_at,
          (SELECT name FROM user WHERE id = t.created_by) AS added_by,
          COALESCE(l.out_qty, 0) AS out_qty,
          COALESCE(l.damaged_qty, 0) AS damaged_qty,
          COALESCE(l.lost_qty, 0) AS lost_qty,
-         t.total_qty - COALESCE(l.out_qty, 0) - COALESCE(l.damaged_qty, 0) - COALESCE(l.lost_qty, 0) AS on_hand,
+         1 - COALESCE(l.out_qty, 0) - COALESCE(l.damaged_qty, 0) - COALESCE(l.lost_qty, 0) AS on_hand,
          (SELECT w.name FROM checkout_line cl2
             JOIN checkout c2 ON c2.id = cl2.checkout_id
             JOIN worker w ON w.id = c2.worker_id
-           WHERE cl2.tool_id = t.id AND cl2.removed = 0 AND t.item_type = 'unique'
+           WHERE cl2.tool_id = t.id AND cl2.removed = 0
              AND cl2.qty_out > (SELECT COALESCE(SUM(qty), 0) FROM return_event WHERE checkout_line_id = cl2.id AND voided = 0)
            LIMIT 1) AS out_to
   FROM tool t

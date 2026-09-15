@@ -9,8 +9,6 @@ export type ToolStock = {
   scan_code: string | null;
   serial_number: string | null;
   manufacturer: string | null;
-  item_type: "unique" | "quantity";
-  total_qty: number;
   status: "active" | "damaged" | "lost" | "retired";
   import_flag: string | null;
   notes: string | null;
@@ -21,10 +19,10 @@ export type ToolStock = {
   damaged_qty: number;
   lost_qty: number;
   on_hand: number;
-  out_to: string | null; // unique tools only: worker currently holding it
+  out_to: string | null; // worker currently holding it
 };
 
-// on_hand = total - out - damaged - lost, computed from checkout lines and return events.
+// on_hand = 1 - out - damaged - lost, computed from checkout lines and return events.
 const STOCK_SQL = fs.readFileSync(path.join(process.cwd(), "src", "db", "stock.sql"), "utf8");
 
 export function allToolStock(): ToolStock[] {

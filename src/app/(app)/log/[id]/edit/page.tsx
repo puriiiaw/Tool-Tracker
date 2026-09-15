@@ -21,10 +21,10 @@ export default async function EditCheckoutPage({
   const events = returnEvents(co.id);
   const workers = db.prepare("SELECT id, name FROM worker WHERE active = 1 OR id = ? ORDER BY name").all(co.worker_id) as { id: number; name: string }[];
   const tools = (
-    db.prepare("SELECT id, name, item_type, serial_number, scan_code FROM tool WHERE status = 'active' ORDER BY name").all() as {
-      id: number; name: string; item_type: string; serial_number: string | null; scan_code: string | null;
+    db.prepare("SELECT id, name, serial_number, scan_code FROM tool WHERE status = 'active' ORDER BY name").all() as {
+      id: number; name: string; serial_number: string | null; scan_code: string | null;
     }[]
-  ).map((t) => ({ id: t.id, name: t.item_type === "unique" ? `${t.name} · ${t.serial_number || t.scan_code || t.id}` : t.name }));
+  ).map((t) => ({ id: t.id, name: `${t.name} · ${t.serial_number || t.scan_code || t.id}` }));
 
   return (
     <form action={editCheckout} className="flex flex-col gap-3">
@@ -56,7 +56,6 @@ export default async function EditCheckoutPage({
             ))}
           </select>
           <div className="flex items-center gap-3">
-            <input type="number" inputMode="numeric" name={`qty_${l.id}`} min={1} defaultValue={l.qty_out} className="input w-20" />
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name={`lt_${l.id}`} defaultChecked={!!l.long_term} className="size-5" /> Long-term
             </label>
@@ -64,9 +63,7 @@ export default async function EditCheckoutPage({
               <input type="checkbox" name={`remove_${l.id}`} className="size-5" /> Remove
             </label>
           </div>
-          {l.returned + l.damaged + l.lost > 0 && (
-            <p className="text-xs text-zinc-500">{l.returned + l.damaged + l.lost} already back on this line.</p>
-          )}
+          {l.returned + l.damaged + l.lost > 0 && <p className="text-xs text-zinc-500">Already back on this line.</p>}
         </div>
       ))}
 
@@ -78,12 +75,9 @@ export default async function EditCheckoutPage({
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
-        <div className="flex items-center gap-3">
-          <input type="number" inputMode="numeric" name="new_qty" min={1} defaultValue={1} className="input w-20" />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="new_lt" className="size-5" /> Long-term
-          </label>
-        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="new_lt" className="size-5" /> Long-term
+        </label>
       </div>
 
       {events.length > 0 && (
@@ -97,7 +91,6 @@ export default async function EditCheckoutPage({
               </div>
               {!e.voided && (
                 <div className="flex items-center gap-2">
-                  <input type="number" inputMode="numeric" name={`rqty_${e.id}`} min={1} defaultValue={e.qty} className="input w-20" />
                   <select name={`rout_${e.id}`} defaultValue={e.outcome} className="input flex-1">
                     <option value="returned">Returned</option>
                     <option value="damaged">Damaged</option>

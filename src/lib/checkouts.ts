@@ -5,7 +5,8 @@ export type LineRow = {
   checkout_id: number;
   tool_id: number;
   tool_name: string;
-  item_type: "unique" | "quantity";
+  serial: string | null;
+  scan_code: string | null;
   qty_out: number;
   long_term: number;
   returned: number;
@@ -105,7 +106,7 @@ function attachLines(rows: Omit<CheckoutRow, "lines">[]): CheckoutRow[] {
   const lines = db
     .prepare(
       `WITH line_agg AS (${LINE_AGG})
-       SELECT la.*, t.name AS tool_name, t.item_type FROM line_agg la JOIN tool t ON t.id = la.tool_id
+       SELECT la.*, t.name AS tool_name, t.serial_number AS serial, t.scan_code FROM line_agg la JOIN tool t ON t.id = la.tool_id
        WHERE la.checkout_id IN (${ids.map(() => "?").join(",")}) ORDER BY la.id`
     )
     .all(...ids) as LineRow[];
@@ -121,15 +122,12 @@ export type ReturnEventRow = {
   outcome: string;
   admin_name: string;
   created_at: string;
-  unscanned: number; // 1 when the line has scanned tags but this return named none of them
 };
 
 export function returnEvents(checkoutId: number): ReturnEventRow[] {
   return db
     .prepare(
-      `SELECT r.id, r.checkout_line_id, r.voided, t.name AS tool_name, r.qty, r.outcome, u.name AS admin_name, r.created_at,
-              EXISTS(SELECT 1 FROM checkout_line_unit WHERE checkout_line_id = cl.id)
-                AND NOT EXISTS(SELECT 1 FROM checkout_line_unit WHERE return_event_id = r.id) AS unscanned
+      `SELECT r.id, r.checkout_line_id, r.voided, t.name AS tool_name, r.qty, r.outcome, u.name AS admin_name, r.created_at
        FROM return_event r
        JOIN checkout_line cl ON cl.id = r.checkout_line_id
        JOIN tool t ON t.id = cl.tool_id
