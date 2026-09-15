@@ -735,6 +735,11 @@ Checkout has no quantity field: the foreman scans the tag or searches and picks 
 Stock Summary on the dashboard and the Tools page group rows by category or model name for display ("on hand / total" = counted rows); every count still comes from checkout lines and return events.
 Pre-launch reset: `scripts/reset-inventory.mjs` emptied tools, checkouts, returns and imports once; accounts and workers were kept. Sections above that describe quantity items, translations or a quantity field are historical.
 
+14. Worker roster upload and lifecycle (decided 2026-09-15)
+Adding: any admin adds one worker by name (Workers page or checkout quick-add). The super-admin can also upload a .xlsx with one name per row under a "Name" header; a template is downloadable from the Workers page and kept at docs/workers-template.xlsx. Upload shows a preview (new / brought back / already here, plus look-alike names) before Confirm. It never removes anyone.
+Matching: names compare case- and whitespace-insensitively. A name that matches an inactive or removed worker reactivates that row rather than creating a duplicate.
+Lifecycle: Active and Inactive tabs with counts. Any admin can inactivate (blocked while the worker holds tools) or reactivate from the worker page. Super-admin can remove an inactive worker: the row is hidden from the roster but kept, so the log still shows their history.
+
 12. Scanning (decided 2026-09-14)
 Who: the foreman or admin, on their own phone, inside the checkout and returns screens. Workers never scan.
 How: a camera button next to the tool field opens continuous mode; each read beeps, flashes and adds a line; Done closes the camera. The Hilti tag is a Data Matrix; decoded on the phone with zxing, no data leaves the site.

@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { fmtTime } from "@/lib/format";
-import { planImport } from "@/lib/import";
+import { planImport, type ExportRow } from "@/lib/import";
 import { stagedFile } from "@/lib/staging";
 import { commitImport, uploadExport } from "./actions";
 
@@ -12,7 +12,7 @@ export default async function ImportPage({
 }) {
   await requireUser("super_admin");
   const { t = "", msg } = await searchParams;
-  const staged = t ? stagedFile(t) : null;
+  const staged = t ? stagedFile<ExportRow>(t) : null;
   const runs = db
     .prepare("SELECT r.run_at, r.file_name, r.counts_json, u.name FROM import_run r JOIN user u ON u.id = r.run_by ORDER BY r.id DESC LIMIT 5")
     .all() as { run_at: string; file_name: string; counts_json: string; name: string }[];

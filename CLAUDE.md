@@ -9,7 +9,14 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - One site only. Every table still carries `site_id = 1` so multi-site is a data change later.
 - Two login roles: `super_admin` and `admin`. No read-only role. No worker logins ever.
 - Super-admin creates accounts and sets or changes any password directly. No email, no reset links.
-- Workers are roster rows: `name` only, no trade. Quick-add from the checkout screen.
+- Workers are roster rows: `name` only, no trade. Quick-add from the checkout screen, "+ Add
+  worker" on the Workers page (any admin), or a one-column .xlsx upload with preview
+  (super-admin; template at `docs/workers-template.xlsx` and `/workers/template`).
+  Upload is additive: names already there are skipped, inactive or removed ones come back.
+- Worker lifecycle (decided 2026-09-15): Active / Inactive tabs. Any admin can inactivate
+  (blocked while tools are out) or reactivate. Super-admin can "remove" an inactive worker:
+  `worker.hidden = 1`, gone from the roster, still named on old checkouts. Adding the same
+  name again un-hides the row instead of creating a duplicate.
 - Every tool is one row per serial, keyed by its ON!Track scan code, out to at most one
   worker (decided 2026-09-15; replaces the earlier unique/quantity split). Batteries and
   chargers are serials too. Grouping by model name is display only: the dashboard Stock

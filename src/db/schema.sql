@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS worker (
   site_id INTEGER NOT NULL DEFAULT 1,
   name TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1,
+  hidden INTEGER NOT NULL DEFAULT 0, -- removed from the roster page; old checkouts still name them
   created_by INTEGER REFERENCES user(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

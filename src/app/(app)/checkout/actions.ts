@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { toolStock } from "@/lib/inventory";
 import { categoryFor } from "@/lib/category";
 import { lookupCode, type ScanHit } from "@/lib/scan";
+import { cleanName, looseKey, upsertWorker } from "@/lib/workers";
 import { recordReturns } from "@/app/(app)/log/actions";
 
 export type Line = { toolId: number; longTerm: boolean };
@@ -45,34 +46,24 @@ export async function addScannedTool(code: string, name: string): Promise<{ erro
   return { hit: lookupCode(code) };
 }
 
-function normalize(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
 // Quick-add from the checkout screen. Warns on near-duplicate names unless force is set.
 type AddWorkerResult = { error: string } | { similar: { id: number; name: string }[] } | { worker: { id: number; name: string } };
 
 export async function addWorker(name: string, force = false): Promise<AddWorkerResult> {
   const actor = await requireUser();
-  name = name.trim().replace(/\s+/g, " ");
+  name = cleanName(name);
   if (!name) return { error: "Name is required." };
-  const key = normalize(name);
-  const existing = db.prepare("SELECT id, name FROM worker WHERE active = 1").all() as {
+  const key = looseKey(name);
+  const existing = db.prepare("SELECT id, name FROM worker WHERE active = 1 AND hidden = 0").all() as {
     id: number;
     name: string;
   }[];
   const similar = existing.filter((w) => {
-    const k = normalize(w.name);
+    const k = looseKey(w.name);
     return k === key || k.includes(key) || key.includes(k);
   });
   if (similar.length && !force) return { similar };
-  const id = db.transaction(() => {
-    const id = Number(
-      db.prepare("INSERT INTO worker (name, created_by) VALUES (?, ?)").run(name, actor.id).lastInsertRowid
-    );
-    audit(actor.id, "worker", id, "create", null, { id, name });
-    return id;
-  })();
+  const id = db.transaction(() => upsertWorker(db, name, actor.id))();
   return { worker: { id, name } };
 }
 
