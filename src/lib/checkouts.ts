@@ -121,12 +121,15 @@ export type ReturnEventRow = {
   outcome: string;
   admin_name: string;
   created_at: string;
+  unscanned: number; // 1 when the line has scanned tags but this return named none of them
 };
 
 export function returnEvents(checkoutId: number): ReturnEventRow[] {
   return db
     .prepare(
-      `SELECT r.id, r.checkout_line_id, r.voided, t.name AS tool_name, r.qty, r.outcome, u.name AS admin_name, r.created_at
+      `SELECT r.id, r.checkout_line_id, r.voided, t.name AS tool_name, r.qty, r.outcome, u.name AS admin_name, r.created_at,
+              EXISTS(SELECT 1 FROM checkout_line_unit WHERE checkout_line_id = cl.id)
+                AND NOT EXISTS(SELECT 1 FROM checkout_line_unit WHERE return_event_id = r.id) AS unscanned
        FROM return_event r
        JOIN checkout_line cl ON cl.id = r.checkout_line_id
        JOIN tool t ON t.id = cl.tool_id

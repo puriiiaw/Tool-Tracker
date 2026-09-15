@@ -6,17 +6,18 @@ import { createTool } from "./actions";
 export default async function ToolsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; msg?: string; add?: string; status?: string; flag?: string; category?: string }>;
+  searchParams: Promise<{ q?: string; msg?: string; add?: string; status?: string; flag?: string; category?: string; onsite?: string }>;
 }) {
   await requireUser();
-  const { q = "", msg, add, status, flag, category } = await searchParams;
+  const { q = "", msg, add, status, flag, category, onsite } = await searchParams;
   const k = q.toLowerCase();
   const tools = allToolStock().filter(
     (t) =>
       (!k || [t.name, t.model, t.scan_code, t.serial_number].some((f) => f && f.toLowerCase().includes(k))) &&
       (!status || t.status === status) &&
       (!flag || t.import_flag) &&
-      (!category || t.category === category)
+      (!category || t.category === category) &&
+      (!onsite || t.added_by)
   );
   return (
     <div className="flex flex-col gap-3">
@@ -50,6 +51,9 @@ export default async function ToolsPage({
         <input name="q" defaultValue={q} placeholder="Search name, model, scan code, serial" className="input" />
         <button className="btn">Go</button>
       </form>
+      <Link href={onsite ? "/tools" : "/tools?onsite=1"} className="text-sm text-blue-700 underline">
+        {onsite ? "Show all tools" : "Show only tools added on site"}
+      </Link>
 
       <ul className="flex flex-col gap-1">
         {tools.map((t) => (
@@ -60,6 +64,7 @@ export default async function ToolsPage({
                 <div className="text-xs text-zinc-500">
                   {t.item_type === "unique" ? t.serial_number || t.scan_code || t.model : t.model}
                   {t.import_flag && <span className="ml-1 text-amber-700">· {t.import_flag}</span>}
+                  {t.added_by && <span className="ml-1 text-amber-700">· added on site {t.created_at.slice(0, 10)}</span>}
                 </div>
               </div>
               <div className="text-right text-sm">

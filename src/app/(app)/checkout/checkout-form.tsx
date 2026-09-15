@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { addWorker, createCheckout, type Line } from "./actions";
+import { Scanner } from "@/components/scanner";
+import { addScannedTool, addWorker, createCheckout, returnFromHolder, scanLookup, type Line } from "./actions";
+import type { ScanHit } from "@/lib/scan";
 
 type Worker = { id: number; name: string };
 type Tool = {
@@ -15,6 +17,7 @@ type Tool = {
   out_to: string | null;
 };
 type Draft = { worker: Worker | null; lines: Line[]; note: string };
+type Pending = { hit: Exclude<ScanHit, { kind: "unknown" }> } | { code: string; name: string; modelId: number };
 
 const DRAFT_KEY = "checkout-draft";
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -35,6 +38,10 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   const [saved, setSaved] = useState("");
   const [saving, setSaving] = useState(false);
   const [extraWorkers, setExtraWorkers] = useState<Worker[]>([]);
+  const [extraTools, setExtraTools] = useState<Tool[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [scanLog, setScanLog] = useState<{ text: string; bad?: boolean }[]>([]);
+  const [pending, setPending] = useState<Pending | null>(null);
   const toolInput = useRef<HTMLInputElement>(null);
 
   // Keep the half-typed checkout if the connection drops mid-entry.
@@ -59,10 +66,12 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   const allWorkers = [...workers, ...extraWorkers];
   const workerHits = workerQ ? allWorkers.filter((w) => matches([w.name], workerQ)).slice(0, 8) : [];
   const exactWorker = allWorkers.some((w) => norm(w.name) === norm(workerQ));
+  const allTools = [...tools, ...extraTools];
   const toolHits = toolQ
-    ? tools.filter((t) => matches([t.name, t.model, t.scan_code, t.serial_number], toolQ)).slice(0, 8)
+    ? allTools.filter((t) => matches([t.name, t.model, t.scan_code, t.serial_number], toolQ)).slice(0, 8)
     : [];
-  const toolById = (id: number) => tools.find((t) => t.id === id)!;
+  const toolById = (id: number) => allTools.find((t) => t.id === id)!;
+  const models = tools.filter((t) => t.item_type === "quantity");
 
   function pickWorker(w: Worker) {
     setWorker(w);
@@ -93,9 +102,57 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
       ls.map((l, j) => {
         if (j !== i) return l;
         const max = toolById(l.toolId).on_hand;
-        return { ...l, qty: Math.max(1, Math.min(max, absolute ?? l.qty + delta)) };
+        const min = Math.max(1, l.unitIds?.length ?? 0); // scanned tags cannot be counted away
+        return { ...l, qty: Math.max(min, Math.min(max, absolute ?? l.qty + delta)) };
       })
     );
+  }
+
+  const log = (text: string, bad = false) => setScanLog((x) => [{ text, bad }, ...x].slice(0, 5));
+
+  // A scanned tag that is known and free. Server re-validates on save, so no local stock check here.
+  function addHit(hit: Exclude<ScanHit, { kind: "unknown" }>) {
+    if (hit.status !== "active") return log(`${hit.name} is ${hit.status}.`, true);
+    if (hit.kind === "tool") {
+      if (lines.some((l) => l.toolId === hit.toolId)) return log(`${hit.name} is already on this checkout.`, true);
+      if (!allTools.some((t) => t.id === hit.toolId))
+        setExtraTools((x) => [...x, { id: hit.toolId, name: hit.name, model: null, scan_code: null, serial_number: null, item_type: "unique", on_hand: 1, out_to: null }]);
+      setLines((ls) => [...ls, { toolId: hit.toolId, qty: 1, longTerm: false }]);
+      return log(`${hit.name} added.`);
+    }
+    const line = lines.find((l) => l.toolId === hit.toolId);
+    if (line?.unitIds?.includes(hit.unitId)) return log(`That ${hit.name} tag is already scanned.`, true);
+    const n = (line?.unitIds?.length ?? 0) + 1;
+    setLines((ls) =>
+      line
+        ? ls.map((l) => (l === line ? { ...l, qty: Math.max(l.qty + 1, n), unitIds: [...(l.unitIds ?? []), hit.unitId] } : l))
+        : [...ls, { toolId: hit.toolId, qty: 1, longTerm: false, unitIds: [hit.unitId] }]
+    );
+    log(`${hit.name} × ${n}`);
+  }
+
+  async function onCode(code: string) {
+    const hit = await scanLookup(code);
+    if (hit.kind === "unknown") return setPending({ code: hit.code, name: "", modelId: models[0]?.id ?? 0 });
+    if (hit.outTo) return setPending({ hit });
+    addHit(hit);
+  }
+
+  async function resolvePending() {
+    if (!pending) return;
+    setPending(null);
+    if ("hit" in pending) {
+      const h = pending.hit;
+      const res = await returnFromHolder(h.outTo!.lineId, h.kind === "unit" ? h.unitId : undefined);
+      if ("error" in res) return log(res.error, true);
+      log(`Returned from ${h.outTo!.worker}.`);
+      return addHit({ ...h, outTo: null });
+    }
+    const res = await addScannedTool(pending.code, pending.name.trim() ? { name: pending.name } : { toolId: pending.modelId });
+    if ("error" in res) return log(res.error, true);
+    if (res.hit.kind === "unknown") return log("Could not add that tag.", true);
+    log(`Added to inventory: ${res.hit.name}.`);
+    addHit(res.hit);
   }
 
   async function save() {
@@ -185,6 +242,7 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
                 <div className="font-semibold">{t.name}</div>
                 <div className="text-xs text-zinc-500">
                   {t.item_type === "unique" ? t.serial_number || t.scan_code : `${t.on_hand} on hand`}
+                  {l.unitIds?.length ? ` · ${l.unitIds.length} scanned` : ""}
                 </div>
               </div>
               <button className="btn" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
@@ -229,13 +287,18 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
 
       {/* Tool picker */}
       <div className="relative">
-        <input
-          ref={toolInput}
-          className="input"
-          placeholder={lines.length ? "Add another tool" : "Tool name, model, or scan code"}
-          value={toolQ}
-          onChange={(e) => setToolQ(e.target.value)}
-        />
+        <div className="flex gap-2">
+          <input
+            ref={toolInput}
+            className="input flex-1"
+            placeholder={lines.length ? "Add another tool" : "Tool name, model, or scan code"}
+            value={toolQ}
+            onChange={(e) => setToolQ(e.target.value)}
+          />
+          <button type="button" className="btn" onClick={() => { setScanLog([]); setPending(null); setScanning(true); }}>
+            Scan
+          </button>
+        </div>
         {toolHits.length > 0 && (
           <ul className="card absolute z-10 mt-1 w-full p-0">
             {toolHits.map((t) => {
@@ -267,6 +330,34 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
       <input className="input" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
 
       {error && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+
+      {scanning && (
+        <Scanner onCode={onCode} onClose={() => setScanning(false)}>
+          {pending && "hit" in pending && (
+            <div className="mb-2 flex flex-col gap-2 rounded bg-amber-100 p-2 text-black">
+              <p>{pending.hit.name} is out to {pending.hit.outTo!.worker}.</p>
+              <button className="btn" onClick={resolvePending}>Return from {pending.hit.outTo!.worker}, then check out</button>
+              <button className="btn" onClick={() => setPending(null)}>Skip</button>
+            </div>
+          )}
+          {pending && "code" in pending && (
+            <div className="mb-2 flex flex-col gap-2 rounded bg-amber-100 p-2 text-black">
+              <p>Tag {pending.code} is not in inventory.</p>
+              <select className="input" value={pending.modelId} onChange={(e) => setPending({ ...pending, modelId: Number(e.target.value), name: "" })}>
+                {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <input className="input" placeholder="...or a new tool name" value={pending.name} onChange={(e) => setPending({ ...pending, name: e.target.value })} />
+              <button className="btn" onClick={resolvePending}>
+                {pending.name.trim() ? "Add as new tool" : "Add as one more of that model"}
+              </button>
+              <button className="btn" onClick={() => setPending(null)}>Skip</button>
+            </div>
+          )}
+          <p className="text-zinc-400">{worker ? worker.name : "No worker picked yet"} · {lines.length} line{lines.length === 1 ? "" : "s"}</p>
+          {scanLog.map((e, i) => <p key={i} className={e.bad ? "text-red-400" : i === 0 ? "text-green-300" : "text-zinc-300"}>{e.text}</p>)}
+          {!scanLog.length && <p className="text-zinc-500">Point the camera at a Hilti tag.</p>}
+        </Scanner>
+      )}
 
       <div className="fixed inset-x-0 bottom-0 border-t bg-white p-3">
         <button

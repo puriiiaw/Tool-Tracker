@@ -15,6 +15,8 @@ export type ToolStock = {
   import_flag: string | null;
   notes: string | null;
   category: string | null;
+  created_at: string;
+  added_by: string | null; // set when added on site rather than imported
   out_qty: number;
   damaged_qty: number;
   lost_qty: number;

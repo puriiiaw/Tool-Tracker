@@ -18,6 +18,9 @@ function open() {
   if (!cols("return_event").includes("voided")) db.exec("ALTER TABLE return_event ADD COLUMN voided INTEGER NOT NULL DEFAULT 0");
   if (!cols("checkout_line").includes("removed")) db.exec("ALTER TABLE checkout_line ADD COLUMN removed INTEGER NOT NULL DEFAULT 0");
   if (!cols("translation").includes("item_type")) db.exec("ALTER TABLE translation ADD COLUMN item_type TEXT");
+  if (!cols("tool").includes("created_by")) db.exec("ALTER TABLE tool ADD COLUMN created_by INTEGER REFERENCES user(id)");
+  if (!cols("tool_unit").includes("created_by"))
+    db.exec("ALTER TABLE tool_unit ADD COLUMN created_at TEXT; ALTER TABLE tool_unit ADD COLUMN created_by INTEGER REFERENCES user(id)");
   const upd = db.prepare("UPDATE tool SET category = ? WHERE id = ?");
   for (const t of db.prepare("SELECT id, name FROM tool WHERE category IS NULL").all() as { id: number; name: string }[]) upd.run(categoryFor(t.name), t.id);
   // First run: seed a super-admin so the owner can log in and change it.

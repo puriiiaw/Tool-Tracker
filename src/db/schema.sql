@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS tool (
   import_flag TEXT,
   notes TEXT,
   category TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_by INTEGER REFERENCES user(id) -- set only when added on site (scan or form), NULL for imports
 );
 
 CREATE TABLE IF NOT EXISTS tool_unit (
@@ -53,7 +54,9 @@ CREATE TABLE IF NOT EXISTS tool_unit (
   tool_id INTEGER NOT NULL REFERENCES tool(id),
   scan_code TEXT UNIQUE,
   serial_number TEXT,
-  import_flag TEXT
+  import_flag TEXT,
+  created_at TEXT,
+  created_by INTEGER REFERENCES user(id)
 );
 
 CREATE TABLE IF NOT EXISTS checkout (
@@ -82,6 +85,15 @@ CREATE TABLE IF NOT EXISTS return_event (
   created_by INTEGER NOT NULL REFERENCES user(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   voided INTEGER NOT NULL DEFAULT 0 -- a mistaken return is voided, never deleted
+);
+
+-- Which battery/charger tags were scanned on a quantity line. Counts still come from qty_out;
+-- a unit is out while its line is live and its return event is NULL or voided.
+CREATE TABLE IF NOT EXISTS checkout_line_unit (
+  id INTEGER PRIMARY KEY,
+  checkout_line_id INTEGER NOT NULL REFERENCES checkout_line(id),
+  tool_unit_id INTEGER NOT NULL REFERENCES tool_unit(id),
+  return_event_id INTEGER REFERENCES return_event(id)
 );
 
 CREATE TABLE IF NOT EXISTS import_run (

@@ -6,6 +6,7 @@ import { listCheckouts } from "@/lib/checkouts";
 import { fmtTime } from "@/lib/format";
 import { AgeChip } from "@/components/checkout-list";
 import { recordWorkerReturn } from "./actions";
+import { ReturnScanner } from "./return-scanner";
 
 type Holder = { id: number; name: string; items: number };
 
@@ -25,9 +26,12 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-3xl font-bold">Record Return</h1>
-        <p className="text-muted-foreground">Pick the worker, tick what came back.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Record Return</h1>
+          <p className="text-muted-foreground">Scan the tags, or pick the worker and tick what came back.</p>
+        </div>
+        <ReturnScanner />
       </div>
       {msg && <p className="rounded-lg border border-green/30 bg-[#ebf7ee] p-3 text-sm text-green">{msg}</p>}
 

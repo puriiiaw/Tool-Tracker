@@ -21,8 +21,9 @@ type ToolRec = {
   model: string | null;
   item_type: "unique" | "quantity";
   status: string;
+  created_by: number | null;
 };
-type UnitRec = { id: number; tool_id: number; scan_code: string; serial_number: string | null };
+type UnitRec = { id: number; tool_id: number; scan_code: string; serial_number: string | null; created_by: number | null };
 
 export type NameRule = {
   source: string;
@@ -38,7 +39,7 @@ export type Plan = {
   updatedUnique: { id: number; name: string; scan_code: string; changes: Record<string, [unknown, unknown]>; after: Record<string, unknown>; flag: string | null }[];
   unchanged: number;
   quantityGroups: { name: string; model: string | null; manufacturer: string | null; toolId: number | null; newUnits: { scan_code: string; serial_number: string | null }[]; existingUnits: number; flag: string | null }[];
-  missing: { kind: "tool" | "unit"; id: number; tool_id: number; name: string; scan_code: string }[];
+  missing: { kind: "tool" | "unit"; id: number; tool_id: number; name: string; scan_code: string; onSite: boolean }[]; // onSite: added from the app, never in ON!Track
   conflicts: string[];
   counts: { new: number; updated: number; unchanged: number; missing: number };
 };
@@ -68,8 +69,8 @@ export function parseExport(buf: Buffer | ArrayBuffer): ExportRow[] {
 }
 
 export function planImport(db: Database, rows: ExportRow[]): Plan {
-  const tools = db.prepare("SELECT id, name, scan_code, serial_number, manufacturer, model, item_type, status FROM tool").all() as ToolRec[];
-  const units = db.prepare("SELECT id, tool_id, scan_code, serial_number FROM tool_unit").all() as UnitRec[];
+  const tools = db.prepare("SELECT id, name, scan_code, serial_number, manufacturer, model, item_type, status, created_by FROM tool").all() as ToolRec[];
+  const units = db.prepare("SELECT id, tool_id, scan_code, serial_number, created_by FROM tool_unit").all() as UnitRec[];
   const translations = db.prepare("SELECT source_name, english_name, item_type FROM translation").all() as Translation[];
   const tr = new Map(translations.map((t) => [nameKey(t.source_name), t]));
   const uniqueByScan = new Map(tools.filter((t) => t.item_type === "unique").map((t) => [t.scan_code, t]));
@@ -130,11 +131,11 @@ export function planImport(db: Database, rows: ExportRow[]): Plan {
 
   for (const t of tools) {
     if (t.item_type === "unique" && t.scan_code && t.status !== "retired" && !seen.has(t.scan_code))
-      plan.missing.push({ kind: "tool", id: t.id, tool_id: t.id, name: t.name, scan_code: t.scan_code });
+      plan.missing.push({ kind: "tool", id: t.id, tool_id: t.id, name: t.name, scan_code: t.scan_code, onSite: t.created_by != null });
   }
   const toolName = new Map(tools.map((t) => [t.id, t.name]));
   for (const u of units) {
-    if (!seen.has(u.scan_code)) plan.missing.push({ kind: "unit", id: u.id, tool_id: u.tool_id, name: toolName.get(u.tool_id) ?? "", scan_code: u.scan_code });
+    if (!seen.has(u.scan_code)) plan.missing.push({ kind: "unit", id: u.id, tool_id: u.tool_id, name: toolName.get(u.tool_id) ?? "", scan_code: u.scan_code, onSite: u.created_by != null });
   }
 
   plan.names = [...names.values()].sort((a, b) => Number(a.known) - Number(b.known) || b.count - a.count);
@@ -186,12 +187,13 @@ export function applyImport(db: Database, plan: Plan, actorId: number, fileName:
     }
     const missingUnitsByTool = new Map<number, number>();
     for (const m of plan.missing) {
+      const flag = m.onSite ? "added on site, not in ON!Track" : "not in latest export";
       if (m.kind === "tool") {
         const before = getTool.get(m.id);
-        db.prepare("UPDATE tool SET import_flag = 'not in latest export' WHERE id = ?").run(m.id);
+        db.prepare("UPDATE tool SET import_flag = ? WHERE id = ?").run(flag, m.id);
         audit.run(actorId, "tool", m.id, "import_flag", JSON.stringify(before), JSON.stringify(getTool.get(m.id)));
       } else {
-        db.prepare("UPDATE tool_unit SET import_flag = 'not in latest export' WHERE id = ?").run(m.id);
+        db.prepare("UPDATE tool_unit SET import_flag = ? WHERE id = ?").run(flag, m.id);
         missingUnitsByTool.set(m.tool_id, (missingUnitsByTool.get(m.tool_id) ?? 0) + 1);
       }
     }

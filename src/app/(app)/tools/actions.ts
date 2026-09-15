@@ -35,9 +35,9 @@ export async function createTool(form: FormData) {
   const id = db.transaction(() => {
     const id = Number(
       db.prepare(
-        `INSERT INTO tool (name, item_type, total_qty, model, scan_code, serial_number, manufacturer, notes, category)
-         VALUES (@name, @item_type, @total_qty, @model, @scan_code, @serial_number, @manufacturer, @notes, @category)`
-      ).run(v).lastInsertRowid
+        `INSERT INTO tool (name, item_type, total_qty, model, scan_code, serial_number, manufacturer, notes, category, created_by)
+         VALUES (@name, @item_type, @total_qty, @model, @scan_code, @serial_number, @manufacturer, @notes, @category, @created_by)`
+      ).run({ ...v, created_by: actor.id }).lastInsertRowid
     );
     audit(actor.id, "tool", id, "create", null, getRow.get(id));
     return id;

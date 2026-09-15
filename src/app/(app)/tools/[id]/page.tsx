@@ -5,6 +5,8 @@ import { listCheckouts } from "@/lib/checkouts";
 import { CheckoutList } from "@/components/checkout-list";
 import { updateTool } from "../actions";
 import { CATEGORIES } from "@/lib/category";
+import { fmtTime } from "@/lib/format";
+import { unitsForTool } from "@/lib/scan";
 
 export default async function ToolPage({
   params,
@@ -22,6 +24,7 @@ export default async function ToolPage({
   return (
     <div className="flex flex-col gap-3">
       <h1 className="text-xl font-bold">{t.name}</h1>
+      {t.added_by && <p className="text-sm text-amber-700">Added on site by {t.added_by}, {fmtTime(t.created_at)}. Not in ON!Track yet.</p>}
       {msg && <p className="rounded bg-amber-50 p-2 text-sm">{msg}</p>}
 
       <div className="card grid grid-cols-4 text-center text-sm">
@@ -71,6 +74,18 @@ export default async function ToolPage({
         )}
         <button className="btn-primary">Save</button>
       </form>
+
+      {t.item_type === "quantity" && (
+        <details className="card text-sm">
+          <summary className="cursor-pointer font-semibold">Tags ({unitsForTool(t.id).length})</summary>
+          {unitsForTool(t.id).map((u) => (
+            <div key={u.id} className="flex justify-between py-1">
+              <span>{u.scan_code}{u.serial_number ? ` · ${u.serial_number}` : ""}</span>
+              <span className={u.worker ? "text-amber-700" : "text-green-700"}>{u.worker ? `out: ${u.worker}` : "in"}</span>
+            </div>
+          ))}
+        </details>
+      )}
 
       <h2 className="font-semibold">History</h2>
       <CheckoutList rows={history} empty="Never checked out." />

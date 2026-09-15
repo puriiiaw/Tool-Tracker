@@ -150,6 +150,7 @@ export default async function ImportPage({
           {plan.missing.map((m) => (
             <div key={`${m.kind}${m.id}`} className="py-1 text-sm">
               {m.name} · {m.scan_code}{m.kind === "unit" ? " (unit)" : ""}
+              {m.onSite && <span className="text-amber-700"> · added on site, tag it in ON!Track</span>}
             </div>
           ))}
         </details>

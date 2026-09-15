@@ -12,10 +12,19 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - Workers are roster rows: `name` only, no trade. Quick-add from the checkout screen.
 - Tools are `unique` (one row per serial, out to at most one worker) or `quantity`
   (one row per model, e.g. "Battery Nuron B 22-85", with a total count). Batteries and
-  chargers are grouped by model; their individual scan codes are kept in `tool_unit`
-  for future barcode scanning but are never shown at checkout.
+  chargers are grouped by model; their individual scan codes live in `tool_unit`.
+- Scanning (decided 2026-09-14): the foreman scans the Hilti Data Matrix tag with the phone
+  camera as a shortcut inside checkout and returns. Workers still never touch the app.
+  Continuous mode: camera stays open, each scan adds a line, Done closes it.
+  A scanned unique tool adds its line. A scanned battery adds one to its model's line and
+  records the unit (`checkout_line_unit`); returns scan the units back, or fall back to a
+  typed count marked unscanned. A unit already out is blocked with a one-tap
+  "return from X, then check out" fix. Reports group by model; tapping expands to tags.
+  Unknown tag: add as a unit of an existing model, or as a new tool; `created_at` and
+  `created_by` record who added it on site, and the next import lists on-site additions
+  missing from ON!Track. Decoder: zxing, runs on the phone. Needs HTTPS hosting.
 - Scissor lifts, harnesses, fall-arrest gear import as unique tools and are visible at checkout.
-- No barcodes, no due dates, no notifications, no French UI, no consumables.
+- No due dates, no notifications, no French UI, no consumables. No worker badges yet.
 - Nothing is ever deleted. Edits keep the original in `audit_log`. Retire = soft hide.
 - On-hand counts are computed from checkout lines and return events, never stored.
 - The import never closes a checkout and never retires a tool; missing tags are flagged.
@@ -45,6 +54,7 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 4. Dashboard
 5. ON!Track import with preview, translation table, item-type override
 6. CSV export and checkout editing
+7. Camera scanning at checkout and returns; on-site add of unknown tags; HTTPS hosting
 
 Each step is checked on a phone-width viewport before the next starts.
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getCheckout, returnEvents } from "@/lib/checkouts";
+import { unitsForLine } from "@/lib/scan";
 import { fmtTime } from "@/lib/format";
 import { returnAll, returnPartial } from "../actions";
 
@@ -50,6 +51,7 @@ export default async function CheckoutPage({
                     {l.lost ? ` · ${l.lost} lost` : ""}
                     {l.long_term ? " · long-term" : ""}
                   </div>
+                  <Tags lineId={l.id} />
                 </div>
                 {remaining > 0 && (
                   <div className="flex gap-2">
@@ -108,12 +110,26 @@ export default async function CheckoutPage({
             {events.map((e) => (
               <li key={e.id} className={e.voided ? "text-zinc-400 line-through" : ""}>
                 {e.qty}× {e.tool_name} {e.outcome} · {fmtTime(e.created_at)} · {e.admin_name}
-                {e.voided ? " (voided)" : ""}
+                {e.voided ? " (voided)" : e.unscanned ? " · unscanned" : ""}
               </li>
             ))}
           </ul>
         </div>
       )}
     </div>
+  );
+}
+
+// Scanned tags on a quantity line, collapsed; one line per model stays the report unit.
+function Tags({ lineId }: { lineId: number }) {
+  const units = unitsForLine(lineId);
+  if (!units.length) return null;
+  return (
+    <details className="text-xs text-zinc-500">
+      <summary className="cursor-pointer">{units.length} tag{units.length === 1 ? "" : "s"} scanned</summary>
+      {units.map((u) => (
+        <div key={u.scan_code}>{u.scan_code} · {u.back ? "back" : "still out"}</div>
+      ))}
+    </details>
   );
 }

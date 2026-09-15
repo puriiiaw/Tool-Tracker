@@ -12,7 +12,7 @@ const OUTCOMES: Outcome[] = ["returned", "damaged", "lost"];
 export async function recordReturns(
   actorId: number,
   checkoutId: number,
-  items: { lineId: number; qty: number; outcome: Outcome }[]
+  items: { lineId: number; qty: number; outcome: Outcome; unitIds?: number[] }[]
 ) {
   await requireUser();
   const co = getCheckout(checkoutId);
@@ -28,6 +28,14 @@ export async function recordReturns(
           .run(it.lineId, it.qty, it.outcome, actorId).lastInsertRowid
       );
       audit(actorId, "return_event", id, "create", null, { checkoutId, ...it });
+      // Scanned tags on this return. A return without them is "unscanned" in the log.
+      const link = db.prepare(
+        `UPDATE checkout_line_unit SET return_event_id = ? WHERE checkout_line_id = ? AND tool_unit_id = ?
+         AND (return_event_id IS NULL OR return_event_id IN (SELECT id FROM return_event WHERE voided = 1))`
+      );
+      for (const u of it.unitIds ?? []) {
+        if (!link.run(id, it.lineId, u).changes) throw new Error(`${line.tool_name}: that tag is not out on this line.`);
+      }
       // A unique tool that comes back broken or never comes back changes the tool's own status.
       if (line.item_type === "unique" && it.outcome !== "returned") {
         const before = db.prepare("SELECT status FROM tool WHERE id = ?").get(line.tool_id);
