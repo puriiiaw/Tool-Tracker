@@ -11,7 +11,7 @@ npm run dev
 
 Open http://localhost:3000 on the laptop, or http://<laptop-ip>:3000 from a phone on the same Wi-Fi.
 
-First sign-in: email `admin`, password `admin`. Go to **Accounts** straight away, set a real
+First sign-in on your own PC: email `admin`, password `admin`. (On a server, a new database prints a random first password in the log: `journalctl -u tracker`.) Go to **Accounts** straight away, set a real
 password, and create the foremen's accounts. The database is one file, `data/tracker.db`.
 Back it up by copying that file.
 

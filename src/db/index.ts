@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { hashPassword } from "@/lib/password";
@@ -22,10 +23,14 @@ function open() {
   const upd = db.prepare("UPDATE tool SET category = ? WHERE id = ?");
   for (const t of db.prepare("SELECT id, name FROM tool WHERE category IS NULL").all() as { id: number; name: string }[]) upd.run(categoryFor(t.name), t.id);
   // First run: seed a super-admin so the owner can log in and change it.
+  // Production never starts with "admin": use INITIAL_ADMIN_PASSWORD, or a random one printed once to the log.
   if (!db.prepare("SELECT 1 FROM user LIMIT 1").get()) {
+    const prod = process.env.NODE_ENV === "production";
+    const pw = process.env.INITIAL_ADMIN_PASSWORD ?? (prod ? randomBytes(9).toString("base64url") : "admin");
     db.prepare(
       "INSERT OR IGNORE INTO user (email, password_hash, name, role) VALUES (?, ?, ?, 'super_admin')"
-    ).run("admin", hashPassword("admin"), "Site Admin");
+    ).run("admin", hashPassword(pw), "Site Admin");
+    if (prod && !process.env.INITIAL_ADMIN_PASSWORD) console.log(`First run: sign in as "admin" with password ${pw}, then change it.`);
   }
   return db;
 }
