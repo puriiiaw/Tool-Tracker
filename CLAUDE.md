@@ -25,9 +25,13 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
 - Scanning (decided 2026-09-14): the foreman scans the Hilti Data Matrix tag with the phone
   camera as a shortcut inside checkout and returns. Workers still never touch the app.
   Continuous mode: camera stays open, each scan adds a line, Done closes it.
-  A scanned tag adds that tool's line. A tool already out is blocked with a one-tap
-  "return from X, then check out" fix. Returns scan the tag or tick the tool in the
-  worker's open list. Unknown tag: add as a new tool with a typed name; `created_at` and
+  Every scan (checkout and returns) stops on a card showing name, serial and scan code; the
+  foreman taps Confirm (decided 2026-10-06; ignores reads while the card is up, and a tag held
+  in frame counts once). A tool already out shows "still on X's list since <time>, X has N other
+  tools out" with a one-tap "Return from X, give to Y": it returns only that one line, time is
+  now, the audit record names Y. Tapping an out tool in the search box opens the same card.
+  Returns scan the tag or tick the tool in the worker's open list. Serial and scan code show
+  together wherever a tool line appears. Unknown tag: add as a new tool with a typed name; `created_at` and
   `created_by` record who added it on site, and the next import lists on-site additions
   missing from ON!Track. Decoder: zxing, runs on the phone. Needs HTTPS hosting.
 - Scissor lifts, harnesses, fall-arrest gear import as unique tools and are visible at checkout.

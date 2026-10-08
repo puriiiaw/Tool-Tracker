@@ -42,3 +42,7 @@ export function ageOf(sqlite: string, now = Date.now()) {
   const level: "ok" | "warn" | "bad" = d >= 30 ? "bad" : d >= 7 ? "warn" : "ok";
   return { label, level, days: d };
 }
+
+// "Serial 123 · Code 987"; a tool with only one of them shows only that one.
+export const ids = (serial: string | null | undefined, code: string | null | undefined) =>
+  [serial && `Serial ${serial}`, code && `Code ${code}`].filter(Boolean).join(" · ");

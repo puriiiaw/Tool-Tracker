@@ -5,7 +5,7 @@ import { listCheckouts } from "@/lib/checkouts";
 import { CheckoutList } from "@/components/checkout-list";
 import { updateTool } from "../actions";
 import { CATEGORIES } from "@/lib/category";
-import { fmtTime } from "@/lib/format";
+import { fmtTime, ids } from "@/lib/format";
 
 export default async function ToolPage({
   params,
@@ -28,7 +28,7 @@ export default async function ToolPage({
 
       <p className="card text-sm">
         {t.status !== "active" ? <span className="text-red-700">{t.status}</span> : t.out_to ? <span className="text-amber-700">Out to {t.out_to}</span> : <span className="text-green-700">In</span>}
-        {t.scan_code ? ` · ${t.scan_code}` : ""}
+        {ids(t.serial_number, t.scan_code) ? ` · ${ids(t.serial_number, t.scan_code)}` : ""}
       </p>
 
       <form action={updateTool} className="card flex flex-col gap-2">

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getCheckout, returnEvents } from "@/lib/checkouts";
-import { fmtTime } from "@/lib/format";
+import { fmtTime, ids } from "@/lib/format";
 import { returnAll, returnPartial } from "../actions";
 
 export default async function CheckoutPage({
@@ -45,7 +45,7 @@ export default async function CheckoutPage({
                 <div>
                   <Link href={`/tools/${l.tool_id}`} className="font-semibold">{l.tool_name}</Link>
                   <div className="text-xs text-zinc-500">
-                    {l.serial || l.scan_code}
+                    {ids(l.serial, l.scan_code)}
                     {l.returned ? " · returned" : l.damaged ? " · damaged" : l.lost ? " · lost" : " · still out"}
                     {l.long_term ? " · long-term" : ""}
                   </div>

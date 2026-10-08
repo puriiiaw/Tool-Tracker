@@ -4,8 +4,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Full-screen rear camera in continuous mode: every new Data Matrix / QR read calls onCode once,
 // with a beep and a green flash. The parent renders its own status panel as children.
-export function Scanner({ onCode, onClose, children }: { onCode: (code: string) => void; onClose: () => void; children?: ReactNode }) {
+// While `hold` is true (a confirm card is open) reads are ignored.
+export function Scanner({ onCode, onClose, hold = false, children }: { onCode: (code: string) => void; onClose: () => void; hold?: boolean; children?: ReactNode }) {
   const video = useRef<HTMLVideoElement>(null);
+  const holdRef = useRef(hold);
+  holdRef.current = hold;
+  const onCodeRef = useRef(onCode);
+  onCodeRef.current = onCode; // the camera effect runs once; always call the latest handler
   const [flash, setFlash] = useState(false);
   const [error, setError] = useState("");
 
@@ -53,12 +58,14 @@ export function Scanner({ onCode, onClose, children }: { onCode: (code: string) 
         const hits = await readBarcodes(img, { formats: ["DataMatrix", "QRCode", "Code128"], maxNumberOfSymbols: 1 }).catch(() => []);
         const now = Date.now();
         for (const h of hits) {
-          if (!h.text || now - (seen.get(h.text) ?? 0) < 2000) continue; // same tag held in frame counts once
-          seen.set(h.text, now);
+          if (!h.text) continue;
+          const last = seen.get(h.text) ?? 0;
+          seen.set(h.text, now); // every read refreshes it: a tag held in frame counts once, until it leaves for 1.5 s
+          if (holdRef.current || now - last < 1500) continue;
           beep();
           setFlash(true);
           setTimeout(() => setFlash(false), 200);
-          onCode(h.text);
+          onCodeRef.current(h.text);
         }
         busy = false;
       }, 150);

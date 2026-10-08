@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Scanner } from "@/components/scanner";
+import { ScanCard } from "@/components/scan-card";
+import { ids } from "@/lib/format";
 import { addScannedTool, addWorker, createCheckout, returnFromHolder, scanLookup, type Line } from "./actions";
 import type { ScanHit } from "@/lib/scan";
 
@@ -92,22 +94,43 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   }
 
   const log = (text: string, bad = false) => setScanLog((x) => [{ text, bad }, ...x].slice(0, 5));
+  // The scan log is only visible while the camera is open; outside it, problems go to the page.
+  const tell = (text: string, bad = false) => {
+    log(text, bad);
+    if (bad && !scanning) setError(text);
+  };
 
-  // A scanned tag that is known and free. Server re-validates on save, so no local stock check here.
-  function addHit(hit: Exclude<ScanHit, { kind: "unknown" }>) {
-    if (hit.status !== "active") return log(`${hit.name} is ${hit.status}.`, true);
-    if (lines.some((l) => l.toolId === hit.toolId)) return log(`${hit.name} is already on this checkout.`, true);
+  type ToolHit = Exclude<ScanHit, { kind: "unknown" }>;
+
+  // A known tool, free to add. Server re-validates on save, so no local stock check here.
+  function addHit(hit: ToolHit) {
+    if (hit.status !== "active") return tell(`${hit.name} is ${hit.status}.`, true);
+    if (lines.some((l) => l.toolId === hit.toolId)) return tell(`${hit.name} is already on this checkout.`, true);
     if (!allTools.some((t) => t.id === hit.toolId))
-      setExtraTools((x) => [...x, { id: hit.toolId, name: hit.name, model: null, scan_code: null, serial_number: null, out_to: null }]);
-    setLines((ls) => [...ls, { toolId: hit.toolId, longTerm: false }]);
+      setExtraTools((x) => [...x, { id: hit.toolId, name: hit.name, model: null, scan_code: hit.code, serial_number: hit.serial, out_to: null }]);
+    setLines((ls) => (ls.some((l) => l.toolId === hit.toolId) ? ls : [...ls, { toolId: hit.toolId, longTerm: false }])); // checked against the newest list, so two quick reads cannot both add
     log(`${hit.name} added.`);
+  }
+
+  // Every scanned tool waits on a card (name, serial, code) until the foreman confirms.
+  function present(hit: ToolHit) {
+    if (hit.status !== "active") return tell(`${hit.name} is ${hit.status}.`, true);
+    if (lines.some((l) => l.toolId === hit.toolId)) return tell(`${hit.name} is already on this checkout.`, true);
+    setPending({ hit });
   }
 
   async function onCode(code: string) {
     const hit = await scanLookup(code);
     if (hit.kind === "unknown") return setPending({ code: hit.code, name: "" });
-    if (hit.outTo) return setPending({ hit });
-    addHit(hit);
+    present(hit);
+  }
+
+  // Tapping a tool that is out opens the same card as scanning it.
+  async function pickOut(t: Tool) {
+    setToolQ("");
+    if (!t.scan_code) return;
+    const hit = await scanLookup(t.scan_code);
+    if (hit.kind === "tool") present(hit);
   }
 
   async function resolvePending() {
@@ -115,17 +138,28 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
     setPending(null);
     if ("hit" in pending) {
       const h = pending.hit;
-      const res = await returnFromHolder(h.outTo!.lineId);
-      if ("error" in res) return log(res.error, true);
-      log(`Returned from ${h.outTo!.worker}.`);
+      if (h.outTo) {
+        const res = await returnFromHolder(h.outTo.lineId, worker?.name);
+        if ("error" in res) return tell(res.error, true);
+        log(`Returned from ${h.outTo.worker}.`);
+      }
       return addHit({ ...h, outTo: null });
     }
     const res = await addScannedTool(pending.code, pending.name);
-    if ("error" in res) return log(res.error, true);
-    if (res.hit.kind === "unknown") return log("Could not add that tag.", true);
+    if ("error" in res) return tell(res.error, true);
+    if (res.hit.kind === "unknown") return tell("Could not add that tag.", true);
     log(`Added to inventory: ${res.hit.name}.`);
     addHit(res.hit);
   }
+
+  const card = pending && "hit" in pending && (
+    <ScanCard
+      hit={pending.hit}
+      confirmLabel={pending.hit.outTo ? `Return from ${pending.hit.outTo.worker}${worker ? `, give to ${worker.name}` : ""}` : worker ? `Add to ${worker.name}` : "Add"}
+      onConfirm={resolvePending}
+      onCancel={() => setPending(null)}
+    />
+  );
 
   async function save() {
     if (!worker) return setError("Pick a worker.");
@@ -146,7 +180,7 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   }
 
   return (
-    <div className="flex flex-col gap-3 pb-24">
+    <div className="flex flex-col gap-3 pb-28">
       <h1 className="text-xl font-bold">New checkout</h1>
       {saved && <p className="rounded bg-green-50 p-2 text-sm text-green-800">{saved}</p>}
 
@@ -212,7 +246,7 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="font-semibold">{t.name}</div>
-                <div className="text-xs text-zinc-500">{t.serial_number || t.scan_code}</div>
+                <div className="text-xs text-zinc-500">{ids(t.serial_number, t.scan_code)}</div>
               </div>
               <button className="btn" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
                 ✕
@@ -253,9 +287,9 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
           <ul className="card absolute z-10 mt-1 w-full p-0">
             {toolHits.map((t) => (
               <li key={t.id}>
-                <button className={`row ${t.out_to ? "text-zinc-400" : ""}`} disabled={!!t.out_to} onClick={() => addLine(t)}>
+                <button className={`row ${t.out_to ? "text-zinc-400" : ""}`} onClick={() => (t.out_to ? pickOut(t) : addLine(t))}>
                   <span>{t.name}</span>
-                  <span className="block text-xs">{t.out_to ? `out to ${t.out_to}` : t.serial_number || t.scan_code || ""}</span>
+                  <span className="block text-xs">{t.out_to ? `out to ${t.out_to} · ` : ""}{ids(t.serial_number, t.scan_code)}</span>
                 </button>
               </li>
             ))}
@@ -268,15 +302,11 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
 
       {error && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
 
+      {!scanning && card}
+
       {scanning && (
-        <Scanner onCode={onCode} onClose={() => setScanning(false)}>
-          {pending && "hit" in pending && (
-            <div className="mb-2 flex flex-col gap-2 rounded bg-amber-100 p-2 text-black">
-              <p>{pending.hit.name} is out to {pending.hit.outTo!.worker}.</p>
-              <button className="btn" onClick={resolvePending}>Return from {pending.hit.outTo!.worker}, then check out</button>
-              <button className="btn" onClick={() => setPending(null)}>Skip</button>
-            </div>
-          )}
+        <Scanner onCode={onCode} onClose={() => setScanning(false)} hold={!!pending}>
+          {card}
           {pending && "code" in pending && (
             <div className="mb-2 flex flex-col gap-2 rounded bg-amber-100 p-2 text-black">
               <p>Tag {pending.code} is not in inventory.</p>
@@ -291,7 +321,7 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
         </Scanner>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 border-t bg-white p-3">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] border-t bg-white p-3 lg:bottom-0">
         <button
           className="btn-primary w-full"
           disabled={saving || !worker || !lines.length}

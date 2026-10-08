@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getCheckout, returnEvents } from "@/lib/checkouts";
-import { fmtTime, toHalifaxInput } from "@/lib/format";
+import { fmtTime, ids, toHalifaxInput } from "@/lib/format";
 import { editCheckout } from "./actions";
 
 export default async function EditCheckoutPage({
@@ -24,7 +24,7 @@ export default async function EditCheckoutPage({
     db.prepare("SELECT id, name, serial_number, scan_code FROM tool WHERE status = 'active' ORDER BY name").all() as {
       id: number; name: string; serial_number: string | null; scan_code: string | null;
     }[]
-  ).map((t) => ({ id: t.id, name: `${t.name} · ${t.serial_number || t.scan_code || t.id}` }));
+  ).map((t) => ({ id: t.id, name: `${t.name} · ${ids(t.serial_number, t.scan_code) || t.id}` }));
 
   return (
     <form action={editCheckout} className="flex flex-col gap-3">

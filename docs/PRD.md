@@ -247,7 +247,7 @@ ID
  | Single screen. Fields: Worker (type-ahead over roster), then one or more lines of Tool (type-ahead over inventory list) + Quantity. Save. Timestamp and acting admin are set automatically; neither is editable at entry.
  | Must
  | CO-2
- | Tool list is the live inventory: every tool added manually or by import appears immediately; unique tools already out are shown greyed with "out to <worker>"; quantity items show on-hand count and cannot be checked out beyond it.
+ | Tool list is the live inventory: every tool added manually or by import appears immediately; tools already out are shown greyed with "out to <worker>"; tapping one offers "Return from <worker>, give to <new worker>", which returns only that tool; quantity items show on-hand count and cannot be checked out beyond it.
  | Must
  | CO-3
  | Quantity defaults to 1 and is locked at 1 for unique tools.

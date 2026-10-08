@@ -1,9 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
-import { lookupCode } from "@/lib/scan";
 import { recordReturns } from "@/app/(app)/log/actions";
 
 type Outcome = "returned" | "damaged" | "lost";
@@ -30,19 +28,4 @@ export async function recordWorkerReturn(form: FormData) {
     fail((e as Error).message);
   }
   redirect(`/returns?worker=${workerId}&msg=${encodeURIComponent("Return recorded.")}`);
-}
-
-// One scan = one item back, committed at once so the beep means done.
-export async function returnByScan(code: string): Promise<{ text: string; bad?: boolean }> {
-  const actor = await requireUser();
-  const hit = lookupCode(code);
-  if (hit.kind === "unknown") return { text: `Tag ${hit.code} is not in inventory.`, bad: true };
-  if (!hit.outTo) return { text: `${hit.name} is not out.`, bad: true };
-  const checkoutId = db.prepare("SELECT checkout_id FROM checkout_line WHERE id = ?").pluck().get(hit.outTo.lineId) as number;
-  try {
-    await recordReturns(actor.id, checkoutId, [{ lineId: hit.outTo.lineId, outcome: "returned" }]);
-  } catch (e) {
-    return { text: (e as Error).message, bad: true };
-  }
-  return { text: `${hit.name} back from ${hit.outTo.worker}.` };
 }
