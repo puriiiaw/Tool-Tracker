@@ -12,7 +12,7 @@ const OUTCOMES: Outcome[] = ["returned", "damaged", "lost"];
 export async function recordReturns(
   actorId: number,
   checkoutId: number,
-  items: { lineId: number; outcome: Outcome; to?: string }[] // `to`: handed straight to this worker; lands in the audit record
+  items: { lineId: number; outcome: Outcome }[]
 ) {
   await requireUser();
   const co = getCheckout(checkoutId);

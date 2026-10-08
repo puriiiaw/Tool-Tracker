@@ -5,7 +5,11 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
-export const metadata: Metadata = { title: "Site Tool Tracker" };
+export const metadata: Metadata = {
+  title: "Site Tool Tracker",
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Tool Tracker" },
+};
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#163b6c" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

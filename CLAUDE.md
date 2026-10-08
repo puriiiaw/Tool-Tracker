@@ -34,6 +34,16 @@ live in the PRD (`docs/PRD.md`). This file records the decisions that govern the
   together wherever a tool line appears. Unknown tag: add as a new tool with a typed name; `created_at` and
   `created_by` record who added it on site, and the next import lists on-site additions
   missing from ON!Track. Decoder: zxing, runs on the phone. Needs HTTPS hosting.
+- Offline (decided 2026-10-08): checkout and return scanning work with no signal. Save and every
+  return write to an outbox on the phone (IndexedDB, `src/lib/queue.ts`); the phone sends in order
+  when signal returns and the server applies each item once (`sync_item` id, `src/lib/sync.ts`).
+  The recorded time is the tap time. Workers and tools made offline merge by name / scan code when
+  sent. If a tool is already out to someone else on arrival, the first to arrive wins and the other
+  line becomes an `attention` row an admin hands over or dismisses on the Dashboard. A bar on every
+  screen shows what is waiting; the tool list refreshes every 5 minutes online and warns at 4 h and
+  24 h old when offline. Foremen add the app to the Home Screen (iPhone Safari erases unused site
+  data after about a week). Service worker is hand-written (`public/sw.js`); the scanner's wasm is
+  served from `public/`. No new packages.
 - Scissor lifts, harnesses, fall-arrest gear import as unique tools and are visible at checkout.
 - No due dates, no notifications, no French UI, no consumables. No worker badges yet.
 - Nothing is ever deleted. Edits keep the original in `audit_log`. Retire = soft hide.

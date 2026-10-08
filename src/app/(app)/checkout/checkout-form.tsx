@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Scanner } from "@/components/scanner";
 import { ScanCard } from "@/components/scan-card";
 import { ids } from "@/lib/format";
-import { addScannedTool, addWorker, createCheckout, returnFromHolder, scanLookup, type Line } from "./actions";
+import { enqueue, flush, newId, useQueued, within } from "@/lib/queue";
+import { localHit, withQueue } from "@/lib/overlay";
+import { addScannedTool, addWorker, scanLookup } from "./actions";
 import type { ScanHit } from "@/lib/scan";
+import type { QLine } from "@/lib/sync";
 
 type Worker = { id: number; name: string };
 type Tool = {
@@ -16,7 +20,7 @@ type Tool = {
   serial_number: string | null;
   out_to: string | null;
 };
-type Draft = { worker: Worker | null; lines: Line[]; note: string };
+type Draft = { worker: Worker | null; lines: QLine[]; note: string; extraWorkers?: Worker[]; extraTools?: Tool[] };
 type Pending = { hit: Exclude<ScanHit, { kind: "unknown" }> } | { code: string; name: string };
 
 const DRAFT_KEY = "checkout-draft";
@@ -29,7 +33,7 @@ function matches(hay: (string | null)[], q: string) {
 
 export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Tool[] }) {
   const [worker, setWorker] = useState<Worker | null>(null);
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<QLine[]>([]);
   const [note, setNote] = useState("");
   const [workerQ, setWorkerQ] = useState("");
   const [toolQ, setToolQ] = useState("");
@@ -43,6 +47,8 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   const [scanLog, setScanLog] = useState<{ text: string; bad?: boolean }[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
   const toolInput = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const queued = useQueued();
 
   // Keep the half-typed checkout if the connection drops mid-entry.
   useEffect(() => {
@@ -53,20 +59,22 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
         setWorker(d.worker);
         setLines(d.lines);
         setNote(d.note);
+        setExtraWorkers(d.extraWorkers ?? []);
+        setExtraTools(d.extraTools ?? []);
       }
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      if (worker || lines.length || note) localStorage.setItem(DRAFT_KEY, JSON.stringify({ worker, lines, note }));
+      if (worker || lines.length || note) localStorage.setItem(DRAFT_KEY, JSON.stringify({ worker, lines, note, extraWorkers, extraTools }));
       else localStorage.removeItem(DRAFT_KEY);
     } catch {}
-  }, [worker, lines, note]);
+  }, [worker, lines, note, extraWorkers, extraTools]);
 
   const allWorkers = [...workers, ...extraWorkers];
   const workerHits = workerQ ? allWorkers.filter((w) => matches([w.name], workerQ)).slice(0, 8) : [];
   const exactWorker = allWorkers.some((w) => norm(w.name) === norm(workerQ));
-  const allTools = [...tools, ...extraTools];
+  const allTools = withQueue([...tools, ...extraTools], queued); // this phone's waiting items count as already sent
   const toolHits = toolQ
     ? allTools.filter((t) => matches([t.name, t.model, t.scan_code, t.serial_number], toolQ)).slice(0, 8)
     : [];
@@ -80,7 +88,13 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   }
 
   async function quickAdd(force: boolean) {
-    const res = await addWorker(workerQ, force);
+    const res = await within(addWorker(workerQ, force), 5000).catch(() => null);
+    if (!res) {
+      // No signal: keep the name on this phone; the server matches it to an existing worker by name when the checkout is sent.
+      const w = { id: -Date.now(), name: workerQ.trim().replace(/\s+/g, " ") };
+      setExtraWorkers((x) => [...x, w]);
+      return pickWorker(w);
+    }
     if ("error" in res) return setError(res.error);
     if ("similar" in res) return setSimilar(res.similar);
     setExtraWorkers((x) => [...x, res.worker]);
@@ -119,8 +133,11 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
     setPending({ hit });
   }
 
+  // The server knows best; without signal (or on a hung one) the phone's own copy answers.
+  const lookup = (code: string) => within(scanLookup(code), 4000).catch(() => localHit(allTools, code));
+
   async function onCode(code: string) {
-    const hit = await scanLookup(code);
+    const hit = await lookup(code);
     if (hit.kind === "unknown") return setPending({ code: hit.code, name: "" });
     present(hit);
   }
@@ -129,7 +146,7 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
   async function pickOut(t: Tool) {
     setToolQ("");
     if (!t.scan_code) return;
-    const hit = await scanLookup(t.scan_code);
+    const hit = await lookup(t.scan_code);
     if (hit.kind === "tool") present(hit);
   }
 
@@ -139,13 +156,25 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
     if ("hit" in pending) {
       const h = pending.hit;
       if (h.outTo) {
-        const res = await returnFromHolder(h.outTo.lineId, worker?.name);
-        if ("error" in res) return tell(res.error, true);
+        try {
+          await enqueue({ id: newId(), at: new Date().toISOString(), kind: "return", toolId: h.toolId, to: worker?.name });
+        } catch {
+          return tell("Could not save on this phone, so the handover was not recorded.", true);
+        }
+        flush();
         log(`Returned from ${h.outTo.worker}.`);
       }
       return addHit({ ...h, outTo: null });
     }
-    const res = await addScannedTool(pending.code, pending.name);
+    const res = await within(addScannedTool(pending.code, pending.name), 5000).catch(() => null);
+    if (!res) {
+      // No signal: the tool is created on the server when this checkout is sent.
+      const id = -Date.now();
+      const name = pending.name.trim();
+      setExtraTools((x) => [...x, { id, name, model: null, scan_code: pending.code, serial_number: null, out_to: null }]);
+      setLines((ls) => [...ls, { toolId: id, longTerm: false }]);
+      return log(`${name} added (created when sent).`);
+    }
     if ("error" in res) return tell(res.error, true);
     if (res.hit.kind === "unknown") return tell("Could not add that tag.", true);
     log(`Added to inventory: ${res.hit.name}.`);
@@ -165,9 +194,15 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
     if (!worker) return setError("Pick a worker.");
     setSaving(true);
     setError("");
-    const res = await createCheckout({ workerId: worker.id, note, lines });
+    // A tool made up offline travels with its name and scan code so the server can create it.
+    const out = lines.map((l) => (l.toolId < 0 ? { ...l, newTool: { code: toolById(l.toolId).scan_code!, name: toolById(l.toolId).name } } : l));
+    try {
+      await enqueue({ id: newId(), at: new Date().toISOString(), kind: "checkout", worker: { id: worker.id, name: worker.name }, note, lines: out });
+    } catch {
+      setSaving(false);
+      return setError("Could not save on this phone. Nothing was recorded; try again.");
+    }
     setSaving(false);
-    if ("error" in res) return setError(res.error);
     setSaved(`Saved: ${worker.name}, ${lines.length} item${lines.length === 1 ? "" : "s"}.`);
     setWorker(null);
     setLines([]);
@@ -175,8 +210,10 @@ export function CheckoutForm({ workers, tools }: { workers: Worker[]; tools: Too
     try {
       localStorage.removeItem(DRAFT_KEY);
     } catch {}
-    // Stock changed; reload the tool list on the next entry.
-    setTimeout(() => location.reload(), 1200);
+    const r = await flush();
+    if (r.left) setSaved((x) => `${x} Waiting for signal; it will send by itself.`);
+    if (r.messages.length) setError(`Needs attention: ${r.messages.join(" ")}`);
+    if (r.sent) router.refresh(); // stock changed
   }
 
   return (

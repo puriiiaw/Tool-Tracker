@@ -3,6 +3,7 @@ import { Undo2 } from "lucide-react";
 import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { listCheckouts } from "@/lib/checkouts";
+import { allToolStock } from "@/lib/inventory";
 import { fmtTime, ids } from "@/lib/format";
 import { AgeChip } from "@/components/checkout-list";
 import { recordWorkerReturn } from "./actions";
@@ -23,6 +24,8 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
   ).filter((h) => !q || h.name.toLowerCase().includes(q.toLowerCase()));
   const selected = workerId ? holders.find((h) => h.id === workerId) : undefined;
   const open = selected ? listCheckouts({ worker: selected.id, status: "open" }) : [];
+  // The scanner keeps this copy for use without signal.
+  const tools = allToolStock().map((t) => ({ id: t.id, name: t.name, scan_code: t.scan_code, serial_number: t.serial_number, out_to: t.out_to }));
 
   return (
     <div className="flex flex-col gap-5">
@@ -31,7 +34,7 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
           <h1 className="text-3xl font-bold">Record Return</h1>
           <p className="text-muted-foreground">Scan the tags, or pick the worker and tick what came back.</p>
         </div>
-        <ReturnScanner />
+        <ReturnScanner tools={tools} />
       </div>
       {msg && <p className="rounded-lg border border-green/30 bg-[#ebf7ee] p-3 text-sm text-green">{msg}</p>}
 

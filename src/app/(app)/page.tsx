@@ -3,7 +3,10 @@ import {
   AlertTriangle, ArrowRight, BatteryCharging, Briefcase, ChevronRight, Drill, FileText, HardHat,
   Plug, Ruler, Undo2, Upload, Users, type LucideIcon,
 } from "lucide-react";
+import { db } from "@/db";
 import { requireUser } from "@/lib/auth";
+import { fmtTime } from "@/lib/format";
+import { dismissAttention, handOverAttention } from "./sync/actions";
 import { listCheckouts } from "@/lib/checkouts";
 import { allToolStock } from "@/lib/inventory";
 import { CATEGORIES, type Category } from "@/lib/category";
@@ -43,8 +46,12 @@ function Stat({ icon: Icon, label, value, sub, tone, href }: {
   );
 }
 
-export default async function Home() {
+type Attn = { id: number; message: string; worker_id: number | null; tool_id: number | null; tap_at: string };
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
   await requireUser();
+  const { msg } = await searchParams;
+  const asks = db.prepare("SELECT id, message, worker_id, tool_id, tap_at FROM attention WHERE resolution IS NULL ORDER BY id").all() as Attn[];
   const open = listCheckouts({ status: "open" }, 500).sort((a, b) => a.created_at.localeCompare(b.created_at));
   const outRows = open.flatMap((c) =>
     c.lines
@@ -63,6 +70,32 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col gap-5">
+      {msg && <p className="rounded-lg bg-green-100 px-3 py-2 text-sm text-green-900">{msg}</p>}
+      {asks.length > 0 && (
+        <section className="panel border border-red/30 p-4">
+          <h2 className="text-xl font-bold">Sent from a phone, needs a decision</h2>
+          <ul className="mt-2 divide-y">
+            {asks.map((a) => (
+              <li key={a.id} className="flex flex-col gap-2 py-3">
+                <p>{a.message}</p>
+                <p className="text-xs text-muted-foreground">Recorded on the phone {fmtTime(a.tap_at)}</p>
+                <div className="flex gap-2">
+                  {a.worker_id && a.tool_id && (
+                    <form action={handOverAttention}>
+                      <input type="hidden" name="id" value={a.id} />
+                      <button className="btn-primary">Hand over</button>
+                    </form>
+                  )}
+                  <form action={dismissAttention}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <button className="btn">Dismiss</button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
         <Stat icon={Upload} label="Open Checkouts" value={open.length} sub="Tools currently out on site" tone="blue" href="/log" />
         <Stat icon={Users} label="Workers Holding Tools" value={holders} sub="Active workers with tools" tone="green" href="/workers" />

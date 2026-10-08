@@ -32,7 +32,9 @@ export function Scanner({ onCode, onClose, hold = false, children }: { onCode: (
     };
 
     (async () => {
-      const { readBarcodes } = await import("zxing-wasm/reader"); // ponytail: wasm comes from jsDelivr; serve from /public if the site must work without internet
+      const { readBarcodes, setZXingModuleOverrides } = await import("zxing-wasm/reader");
+      // Served from /public (copy of node_modules/zxing-wasm/dist/reader/zxing_reader.wasm; refresh it when zxing-wasm is upgraded) so scanning works offline.
+      setZXingModuleOverrides({ locateFile: (path, prefix) => (path.endsWith(".wasm") ? "/zxing_reader.wasm" : prefix + path) });
       if (!navigator.mediaDevices?.getUserMedia) return setError("The camera only works over HTTPS on this phone.");
       try {
         stream = await navigator.mediaDevices.getUserMedia({

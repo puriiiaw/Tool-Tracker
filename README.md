@@ -29,3 +29,15 @@ Back it up by copying that file.
 npm test
 npm run build
 ```
+
+## Using it on a phone (no signal on site)
+
+Open the site once with signal, sign in, then add it to the Home Screen so the phone keeps its saved data:
+
+- **iPhone (Safari):** Share button, then **Add to Home Screen**.
+- **Android (Chrome):** menu (three dots), then **Install app** or **Add to Home screen**.
+
+Open it from that icon. With no signal you can still check out and scan returns: a bar at the top shows
+how many items are waiting, and they send by themselves when the signal returns. If the bar is red
+(waiting over a day), get signal soon. Anything the server could not apply as asked shows on the
+Dashboard for an admin.

@@ -46,3 +46,9 @@ export function ageOf(sqlite: string, now = Date.now()) {
 // "Serial 123 · Code 987"; a tool with only one of them shows only that one.
 export const ids = (serial: string | null | undefined, code: string | null | undefined) =>
   [serial && `Serial ${serial}`, code && `Code ${code}`].filter(Boolean).join(" · ");
+
+// ponytail: Hilti tags decode to the 9-digit scan code; if a tag ever carries a URL, the first 9-digit run is used.
+export function normalizeCode(raw: string) {
+  const s = raw.replace(/\s+/g, "");
+  return /\d{9}/.exec(s)?.[0] ?? s;
+}

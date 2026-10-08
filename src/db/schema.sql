@@ -104,3 +104,27 @@ BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 
 INSERT OR IGNORE INTO site (id, name) VALUES (1, 'EX-4002 QEII Halifax Infirmary Expansion');
 
+-- Items sent from phones (a checkout or a return, possibly queued offline). The id comes from the phone,
+-- so a retried send is recognised and applied only once.
+CREATE TABLE IF NOT EXISTS sync_item (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  tap_at TEXT NOT NULL, -- when the foreman tapped on the phone
+  received_at TEXT NOT NULL DEFAULT (datetime('now')),
+  outcome TEXT NOT NULL CHECK (outcome IN ('done', 'ignored', 'rejected'))
+);
+
+-- Something a phone sent that could not be applied as asked (e.g. tool already out to someone else).
+-- Never deleted: an admin resolves it and the row keeps how.
+CREATE TABLE IF NOT EXISTS attention (
+  id INTEGER PRIMARY KEY,
+  sync_id TEXT NOT NULL, -- the sync_item that raised it
+  message TEXT NOT NULL,
+  worker_id INTEGER REFERENCES worker(id), -- who wanted the tool
+  tool_id INTEGER REFERENCES tool(id),
+  tap_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolution TEXT, -- NULL = open; 'dismissed' or 'handed over'
+  resolved_by INTEGER REFERENCES user(id),
+  resolved_at TEXT
+);
