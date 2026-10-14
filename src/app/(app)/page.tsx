@@ -58,7 +58,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
       .map((l) => ({ ...l, remaining: l.qty_out - l.returned - l.damaged - l.lost, checkout: c }))
       .filter((l) => l.remaining > 0)
   );
-  const holders = new Set(open.map((c) => c.worker_id)).size;
+  // One row per worker; outRows is oldest first, so the first row seen sets the age
+  const byWorker = new Map<number, { id: number; name: string; count: number; since: string }>();
+  for (const r of outRows) {
+    const w = byWorker.get(r.checkout.worker_id);
+    if (w) w.count += r.remaining;
+    else byWorker.set(r.checkout.worker_id, { id: r.checkout.worker_id, name: r.checkout.worker_name, count: r.remaining, since: r.checkout.created_at });
+  }
+  const holdersOut = [...byWorker.values()];
+  const holders = holdersOut.length;
   const tools = allToolStock();
   const active = tools.filter((t) => t.status === "active");
   const onHand = active.reduce((s, t) => s + Math.max(0, t.on_hand), 0);
@@ -108,39 +116,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
         <section className="panel p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Currently Out</h2>
-            <Link href="/log" className="flex items-center gap-1 text-sm font-medium text-blue hover:underline">View all <ArrowRight className="size-4" /></Link>
+            <Link href="/returns" className="flex items-center gap-1 text-sm font-medium text-blue hover:underline">View all <ArrowRight className="size-4" /></Link>
           </div>
-          {outRows.length ? (
-            <table className="mt-3 w-full text-[15px]">
-              <thead>
-                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 font-semibold">Worker</th>
-                  <th className="py-2 font-semibold">Tool</th>
-                  <th className="py-2 text-right font-semibold">Qty</th>
-                  <th className="hidden py-2 text-right font-semibold sm:table-cell">Age</th>
-                </tr>
-              </thead>
-              <tbody>
-                {outRows.slice(0, 8).map((r) => (
-                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-2.5">
-                      <Link href={`/log/${r.checkout.id}`} className="flex items-center gap-3">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-navy">{initials(r.checkout.worker_name)}</span>
-                        <span className="font-medium">{r.checkout.worker_name}</span>
-                      </Link>
-                    </td>
-                    <td className="py-2.5">{r.tool_name}</td>
-                    <td className="py-2.5 text-right tabular-nums">{r.remaining}</td>
-                    <td className="hidden py-2.5 text-right sm:table-cell"><AgeChip at={r.checkout.created_at} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {holdersOut.length ? (
+            <ul className="mt-3">
+              {holdersOut.slice(0, 8).map((w) => (
+                <li key={w.id} className="border-b last:border-0">
+                  <Link href={`/returns?worker=${w.id}`} className="flex min-h-14 items-center gap-3 py-2 hover:bg-muted/50">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold text-navy">{initials(w.name)}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
+                    <span className="tabular-nums text-muted-foreground">{w.count} {w.count === 1 ? "tool" : "tools"}</span>
+                    <AgeChip at={w.since} />
+                    <ChevronRight className="size-5 shrink-0 opacity-50" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           ) : (
             <p className="py-10 text-center text-muted-foreground">Everything is in.</p>
           )}
-          {outRows.length > 8 && (
-            <Link href="/log" className="mt-2 block text-center text-sm text-muted-foreground hover:underline">{outRows.length - 8} more</Link>
+          {holdersOut.length > 8 && (
+            <Link href="/returns" className="mt-2 block text-center text-sm text-muted-foreground hover:underline">{holdersOut.length - 8} more workers</Link>
           )}
         </section>
 
